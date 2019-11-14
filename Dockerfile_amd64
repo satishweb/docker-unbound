@@ -43,4 +43,4 @@ ENTRYPOINT ["/docker-entrypoint"]
 CMD [ "/usr/bin/supervisord", "-c", "/etc/supervisor/supervisord.conf" ]
 
 # Healthcheck
-HEALTHCHECK --interval=1m --timeout=10s --start-period=10s CMD drill @127.0.0.1 google.com || exit 1
+HEALTHCHECK --interval=5s --timeout=3s --start-period=10s CMD drill @127.0.0.1 google.com || exit 1
