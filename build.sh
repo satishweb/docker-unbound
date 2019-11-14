@@ -6,7 +6,6 @@
 ## INIT
 ##############
 sDir=$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )
-logFile=$sDir/data/build.log
 image="satishweb/unbound"
 
 # Get params
@@ -21,7 +20,7 @@ imgPush=$2
 usage() {
   echo "Usage: $0 <BuildType> <ImagePush> "
   echo "      BuildType: amd64|arm  -- Optional (Def: amd64)"
-  echo "      ImagePush: manual|auto -- Optional (Def: manual)"
+  echo "      ImagePush: manual|auto -- Optional (Def: auto)"
   exit 1
 }
 
@@ -46,21 +45,18 @@ dockerBuild(){
   # $1 = image type
 
   # Lets set appropriate tags based on buildType
-  [[ "$1" == "amd64" ]] && imageTag=latest
-  [[ "$1" == "arm" ]] && imageTag=arm-latest
+  imageTag=${1}-latest
   dockerfile=Dockerfile_$1
   echo "INFO: Building $1 Image: $image:$imageTag ... (may take a while)"
-  echo "      Logs are redirected to $logFile"
-  docker build -f $dockerfile -t $image:$imageTag $1/>$1-$logFile 2>&1
-  errCheck "$?" "Docker Build failed, please check $logfile" "exitOnFail"
+  docker build . -f $dockerfile -t $image:$imageTag
+  errCheck "$?" "Docker Build failed" "exitOnFail"
   
   # Lets identify unbound version and setup image tags
-  unboundVer=$(docker run --rm -it --entrypoint=bash $image:$imageTag -c "unbound -h"|grep -e '^Version '|awk '{print $2}')
+  unboundVer="$(docker run --rm -it --entrypoint=bash $image:$imageTag -c "unbound -h"|grep -e '^Version '|awk '{print $2}'|sed $'s/[^[:print:]\t]//g')"
 
   # Lets set unbound image version tag based on buildType
-  [[ "$1" == "amd64" ]] && verTag=$unboundVer
-  [[ "$1" == "arm" ]] && verTag=arm-$unboundVer
-
+  verTag=${1}-$unboundVer
+ 
   if [[ $unboundVer == *.*.* ]]
     then
       echo "INFO: Creating tags..."
@@ -74,9 +70,9 @@ dockerBuild(){
   if [[ $unboundVer == *.*.* ]]
     then
       echo "INFO: Creating/Updating git tag"
-      git tag -d $verTag| sed 's/^/| GIT: /'
-      git tag $verTag| sed 's/^/| GIT: /'
-      git push origin --tags| sed 's/^/| GIT: /'
+      git tag -d $verTag
+      git tag $verTag
+      git push origin --tags
   fi
 }
 
@@ -85,7 +81,7 @@ dockerBuild(){
 ##############
 
 ! [[ "$buildType" =~ ^(amd64|arm)$ ]] && buildType=amd64
-! [[ "$ImagePush" =~ ^(manual|auto)$ ]] && imgPush=manual
+! [[ "$imgPush" =~ ^(manual|auto)$ ]] && imgPush=auto
 
 ##############
 ## Main method
@@ -93,23 +89,22 @@ dockerBuild(){
 
 # Head
 echo "INFO: Build Type: $buildType"
-echo "INFO: Image Push $ImagePush"
+echo "INFO: Image Push $imgPush"
 echo "NOTE: Execute \"$0 help\" to know parameters list"
 echo "------------------------------------------------"
 # Lets do git pull
 echo "INFO: Fetching latest codebase changes"
-git checkout master| sed 's/^/| GIT: /'
-git pull | sed 's/^/| GIT: /'
+git checkout master
+git pull 
 
 # Lets prepare docker image
 echo "INFO: Removing all tags of image $image ..."
-docker rmi -f $(docker images|grep "$image"|awk '{print $1":"$2}') >/dev/null 2>&1
-errCheck "$?" "Docker images removal failed" "exitOnFail"
-dockerBuild $BuildType
+#docker rmi -f $(docker images|grep "$image"|awk '{print $1":"$2}') >/dev/null 2>&1
+dockerBuild $buildType
 
 # Lets do manual push to docker.
 # To be used only if docker automated build process is failed
-if [[ "$1" == "manual" ]]
+if [[ "$imgPush" == "manual" ]]
   then
     echo "INFO: Logging in to Docker HUB... (Interactive Mode)"
     docker login
