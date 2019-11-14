@@ -1,0 +1,72 @@
+#!/bin/bash
+# Author: Satish Gaikwad <satish@satishweb.com>
+set -e
+
+if [ -f /run/secrets/DEBUG ]; then
+    export DEBUG=$(cat $i)
+fi
+
+if [ "$DEBUG" = "1" ]; then
+    set -x
+    BASH_CMD_FLAGS='-x'
+fi
+
+export UNBOUND_CONFIG_FILE=/etc/unbound/unbound.conf.d/unbound-server.conf
+export UNBOUND_ANCHOR_FILE=/var/lib/unbound/root.key
+export UNBOUND_BLOCKED_HOSTS_FILE=/etc/unbound/unbound.blocked.hosts
+
+printf "|---------------------------------------------------------------------------------------------\n";
+printf "| Starting Unbound DNS Cache Server\n"
+
+# Load env vars
+printf "| ENTRYPOINT: \033[0;31mLoading docker secrets if found...\033[0m\n"
+for i in $(env|grep '/run/secrets')
+do
+    varName=$(echo $i|awk -F '[=]' '{print $1}'|sed 's/_FILE//')
+    varFile=$(echo $i|awk -F '[=]' '{print $2}')
+    exportCmd="export $varName=$(cat $varFile)"
+    echo "${exportCmd}" >> /etc/profile
+    eval "${exportCmd}"
+    printf "| ENTRYPOINT: Exporting var: $varName\n"
+done
+
+# Lets copy default unbound config file if does not exists
+if [[ ! -f ${UNBOUND_CONFIG_FILE} ]]; then
+  cp -rf /unbound-server.conf ${UNBOUND_CONFIG_FILE}
+fi
+
+# Lets create initial anchor root.key file if does not exists
+if [[ ! -f ${UNBOUND_ANCHOR_FILE} ]]; then
+  unbound-anchor -a ${UNBOUND_ANCHOR_FILE} || echo
+  # We had to add echo to avoid unbound-anchor command non zero exit from
+  # exiting this script. We have set -e set for this script
+else
+  # file exists, lets check the validity
+  unbound-anchor -a ${UNBOUND_ANCHOR_FILE}
+fi
+
+# Lets set correct permissions for root.key anchor file
+chown unbound:unbound ${UNBOUND_ANCHOR_FILE}
+
+# Setup blocked hosts file if it does not exists
+if [[ ! -f ${UNBOUND_BLOCKED_HOSTS_FILE} ]]; then
+  /bin/bash $BASH_CMD_FLAGS /scripts/update_blocked_hosts.sh "${UNBOUND_BLOCKED_HOSTS_FILE}" no-reload
+fi
+
+printf "| ENTRYPOINT: \033[0;31mStarting supervisord (which starts and monitors cron and unbound) \033[0m\n"
+printf "|---------------------------------------------------------------------------------------------\n";
+
+# Lets create cron script for updating host periodically
+printf "SHELL=/bin/bash\nPATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin\n" > /etc/cron.d/updatehosts 
+printf "$UPDATE_BLOCKED_HOSTS_CRON_SETTINGS root /bin/bash $BASH_CMD_FLAGS /scripts/update_blocked_hosts.sh ${UNBOUND_BLOCKED_HOSTS_FILE}\n" >> /etc/cron.d/updatehosts
+
+# Check if app-config is present
+if [ -f /app-config ]; then
+    # We expect that app-config handles the launch of app command
+    echo "| ENTRYPOINT: Executing app-config..."
+    . /app-config "$@"
+else
+    # Let default CMD run if app-config is missing
+    echo "| ENTRYPOINT: app-config was not available, running given parameters or default CMD..."
+    exec $@
+fi

@@ -1,0 +1,46 @@
+# Author: Satish Gaikwad <satish@satishweb.com>
+FROM ubuntu:18.04
+LABEL MAINTAINER satish@satishweb.com
+
+#set default env variables
+ENV DEBIAN_FRONTEND=noninteractive \
+    UPDATE_BLOCKED_HOSTS_CRON_SETTINGS='0 3 * * *'
+
+RUN apt-get update \
+    && apt-get -y install \
+        cron \
+        supervisor \
+        unbound \
+        dnsutils \
+        ldnsutils \
+        sudo \
+        curl \
+        python \
+        openssl \
+        ca-certificates \
+        python-pip \
+        wget \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
+
+# Setup rootkeys
+RUN wget https://www.internic.net/domain/named.root -O /etc/unbound/root.hints
+
+# Add supervisord.conf
+ADD supervisord.conf /etc/supervisor/conf.d/supervisord.conf
+
+# Add scripts and make them executable
+ADD unbound-server.conf /unbound-server.conf
+ADD docker-entrypoint /docker-entrypoint
+COPY scripts /scripts
+RUN chmod u+x /docker-entrypoint /scripts/*
+
+# RUN touch /etc/cron.d/updatehosts
+# RUN chmod u+x /etc/cron.d/updatehosts
+
+# Run the command on container startup
+ENTRYPOINT ["/docker-entrypoint"]
+CMD [ "/usr/bin/supervisord", "-c", "/etc/supervisor/supervisord.conf" ]
+
+# Healthcheck
+HEALTHCHECK --interval=1m --timeout=10s --start-period=10s CMD drill @127.0.0.1 google.com || exit 1
