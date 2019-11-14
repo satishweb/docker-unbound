@@ -1,4 +1,4 @@
-# Docker container for Unbound DNS Cache server
+# Docker Image for Unbound DNS Cache server
 
 ## Features
 - DNS Caching using Unbound - unbound.net
