@@ -60,7 +60,7 @@ dockerBuild(){
   if [[ $unboundVer == *.*.* ]]
     then
       echo "INFO: Creating tags..."
-      docker tag $image $image:$verTag >/dev/null 2>&1
+      docker tag $image:$imageTag $image:$verTag >/dev/null 2>&1
       errCheck "$?" "Tag creation failed"
     else
       echo "WARN: Could not determine awscli version, ignoring tagging..."
