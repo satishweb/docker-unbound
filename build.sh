@@ -2,7 +2,6 @@
 # Author: Satish Gaikwad <satish@satishweb.com>
 
 ## Functions
-
 __usage() {
   if [[ "$1" != "" ]]; then
       echo "ERR: $1 "
@@ -11,6 +10,8 @@ __usage() {
           -i|--image-name <DockerImageName>
           -p|--platforms <PlatformsList>
           -w|--work-dir <WorkDirPath>
+          -t|--git-tag <TagName(Required)>
+          --mark-latest
           --push-images
           --push-git-tags
           --no-cache
@@ -21,6 +22,8 @@ __usage() {
   echo "  -p|--platforms  : list of platforms to build for."
   echo "    (Def: linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6)"
   echo "  -w|--work-dir   : Docker buildx command work dir path"
+  echo "  -t|--git-tag    : Name for git tag to create (Required)"
+  echo "  --mark-latest   : Marks the latest image to given tag"
   echo "  --push-images   : Enables pushing of docker images to docker hub"
   echo "  --push-git-tags : Enabled push of git tags to git remote origin"
   echo "  --no-cache      : Avoid use of docker build cache"
@@ -30,19 +33,30 @@ __usage() {
 
 __processParams() {
   extraDockerArgs=""
+  imageTags=""
   while [ "$1" != "" ]; do
     case $1 in
       -i|--image-name) shift
-                       [[ ! $1 ]] && __usage "Work dir path missing"
+                       [[ ! $1 ]] && __usage "Image name is missing"
                        image="$1"
                        ;;
       -p|--platforms)  shift
-                       [[ ! $1 ]] && __usage "Work dir path missing"
+                       [[ ! $1 ]] && __usage "Platforms list missing"
                        platforms="$1"
                        ;;
       -w|--work-dir)   shift
                        [[ ! $1 ]] && __usage "Work dir path missing"
                        workDir="$1"
+                       ;;
+      -t|--git-tag)    shift
+                       [[ ! $1 ]] && __usage "Git tag name missing"
+                       tagName="$(echo $1\
+                       |sed -e 's/^[ \t]*//;s/[ \t]*$//;s/ /-/g'\
+                       |sed $'s/[^[:print:]\t]//g')"
+                       imageTags+=" $tagName"
+                       ;;
+      --mark-latest)   latestImage=yes
+                       imageTags+=" latest"
                        ;;
       --push-images)   imgPush=yes
                        ;;
@@ -60,6 +74,7 @@ __processParams() {
   platforms="linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6"
   [[ ! $imgPush ]] && imgPush=no
   [[ ! $tagPush ]] && tagPush=no
+  [[ ! $tagName ]] && __usage "Work dir path missing"
   [[ ! $workDir ]] && workDir=$(pwd)
   [[ ! $image ]] && image=$(basename $(pwd))
 }
@@ -120,19 +135,14 @@ __setupDocker() {
 }
 
 __createGitTag() {
-  # Lets create git tag and do push
-  if [[ $verTag == *.*.* ]]
-    then
-      echo "INFO: Creating local git tag: $verTag"
-      git tag -d $verTag >/dev/null 2>&1
-      git tag $verTag >/dev/null 2>&1
-      if [[ "$tagPush" == "yes" ]]; then
-        echo "INFO: Pushing git tag to remote: $verTag"
-        git push --delete origin $verTag >/dev/null 2>&1
-        git push -f origin $verTag >/dev/null 2>&1
-      fi
-  else
-    echo "WARN: Tag name is not valid, expected 3 digits: $verTag"
+  # Lets create git tag
+  echo "INFO: Creating local git tag: $tagName"
+  git tag -d $tagName >/dev/null 2>&1
+  git tag $tagName >/dev/null 2>&1
+  if [[ "$tagPush" == "yes" ]]; then
+    echo "INFO: Pushing git tag to remote: $tagName"
+    git push --delete origin $tagName >/dev/null 2>&1
+    git push -f origin $tagName >/dev/null 2>&1
   fi
 }
 
@@ -143,20 +153,13 @@ __checkSource
 __setupDocker
 
 # Lets identify current unbound version and setup image tags
-verTag="$(docker run --rm --entrypoint=sh alpine -c \
-          "apk update >/dev/null 2>&1; apk info unbound"\
-          |grep -e '^unbound-*.*description'\
-          |awk -F '[- ]' '{print $2}'\
-          |sed -e 's/^[ \t]*//;s/[ \t]*$//;s/ /-/g'\
-          |sed $'s/[^[:print:]\t]//g'\
-        )"
-imageTags="latest $verTag"
+
 echo "INFO: Building Docker Images (may take a while)"
 echo "INFO: Docker image      : $image"
 echo "INFO: Platforms         : $platforms"
 echo "INFO: Docker image tags : $imageTags"
 echo "INFO: Image tags push?  : $imgPush"
-echo "INFO: Git tags          : $verTag"
+echo "INFO: Git tags          : $tagName"
 echo "INFO: Git tags push?    : $tagPush"
 __dockerBuild $image "$imageTags" "$platforms" "$workDir" "$extraDockerArgs"
-__createGitTag
+__createGitTag $tagName
