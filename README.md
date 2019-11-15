@@ -48,3 +48,7 @@ docker build . --no-cache -t satishweb/unbound
 ```
 docker pull satishweb/unbound
 ```
+
+## Credits
+- AD Block Hosts: https://github.com/StevenBlack/hosts
+- Unbound: http://www.unbound.net
