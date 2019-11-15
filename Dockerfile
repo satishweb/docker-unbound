@@ -11,7 +11,7 @@ RUN apk add \
         bind-tools \
         sudo \
         openssl \
-    && rm -rf /etc/unbound/unbound.conf
+    && rm -rf /etc/unbound/unbound.conf /etc/unbound/root.hints
 
 # Add supervisord.conf
 ADD supervisor-unbound.ini /etc/supervisor.d/supervisor-unbound.ini
@@ -21,6 +21,9 @@ ADD unbound.sample.conf /templates/unbound.sample.conf
 ADD docker-entrypoint /docker-entrypoint
 COPY scripts /scripts
 RUN chmod u+x /docker-entrypoint /scripts/*
+
+# Setup rootkeys
+RUN wget https://www.internic.net/domain/named.root -O /etc/unbound/root.hints
 
 # Run the command on container startup
 ENTRYPOINT ["/docker-entrypoint"]
