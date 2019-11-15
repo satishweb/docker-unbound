@@ -13,21 +13,23 @@ __usage() {
           -w|--work-dir <WorkDirPath>
           --push-images
           --push-git-tags
+          --no-cache
           -h|--help"
   echo "Description:"
   echo "  -i|--image-name : Name of the docker image."
   echo "    e.g. satishweb/imagename. (Def: current directory name)"
   echo "  -p|--platforms  : list of platforms to build for."
-  echo "    (Def: linux/amd64,linux/arm64,linux/s390x,"
-  echo "          linux/386,linux/arm/v7,linux/arm/v6)"
+  echo "    (Def: linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6)"
   echo "  -w|--work-dir   : Docker buildx command work dir path"
   echo "  --push-images   : Enables pushing of docker images to docker hub"
   echo "  --push-git-tags : Enabled push of git tags to git remote origin"
+  echo "  --no-cache      : Avoid use of docker build cache"
   echo "  -h|--help       : Prints this help menu"
   exit 1
 }
 
 __processParams() {
+  extraDockerArgs=""
   while [ "$1" != "" ]; do
     case $1 in
       -i|--image-name) shift
@@ -46,6 +48,8 @@ __processParams() {
                        ;;
       --push-git-tags) tagPush=yes
                        ;;
+      --no-cache)      extraDockerArgs+=" --no-cache"
+                       ;;
       -h|--help)       __usage
                        ;;
       * )              __usage "Missing or incorrect parameters"
@@ -53,8 +57,7 @@ __processParams() {
     shift
   done
   [[ ! $platforms ]] && \
-  platforms="linux/amd64,linux/arm64,linux/s390x"
-  platforms+=",linux/386,linux/arm/v7,linux/arm/v6"
+  platforms="linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6"
   [[ ! $imgPush ]] && imgPush=no
   [[ ! $tagPush ]] && tagPush=no
   [[ ! $workDir ]] && workDir=$(pwd)
@@ -107,9 +110,9 @@ __setupDocker() {
   # Lets prepare docker image
   if [[ "$imgPush" == "yes" ]]; then
     echo "INFO: Logging in to Docker HUB... (Interactive Mode)"
-    docker login
+    docker login 2>&1 | sed 's/^/INFO: DOCKER: /g'
     __errCheck "$?" "Docker login failed..."
-    extraDockerArgs=" --push"
+    extraDockerArgs+=" --push"
   fi
   docker buildx create --name builder >/dev/null 2>&1
   docker buildx use builder >/dev/null 2>&1
