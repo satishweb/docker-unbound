@@ -2,7 +2,7 @@
 
 ## Features
 - DNS Caching using Unbound - unbound.net
-- Block ad hosts from https://raw.githubusercontent.com/StevenBlack/hosts/master/hosts
+- Block ad hosts listed in https://raw.githubusercontent.com/StevenBlack/hosts/master/hosts
 - Cron job to update blocked ad hosts daily.
 - Support for custom script execution (/app-config)
 
@@ -10,7 +10,8 @@
 
 ```
 docker run -itd --name unbound \
-    -p 53:53 \
+    -p 53:53/tcp \
+    -p 53:53/udp \
 satishweb/unbound
 ```
 
@@ -18,7 +19,7 @@ satishweb/unbound
 ```
 services:
   unbound:
-    image: satishweb/docker-unbound
+    image: satishweb/unbound
     hostname: unbound
     networks:
       - default
@@ -41,7 +42,7 @@ services:
 
 ## Build Docker image
 ```
-docker build . --no-cache -t docker-unbound
+docker build . --no-cache -t satishweb/unbound
 ```
 ## Pull Docker Hub Image
 ```
