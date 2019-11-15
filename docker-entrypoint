@@ -11,9 +11,11 @@ if [ "$DEBUG" = "1" ]; then
     BASH_CMD_FLAGS='-x'
 fi
 
-export UNBOUND_CONFIG_FILE=/etc/unbound/unbound.conf.d/unbound-server.conf
-export UNBOUND_ANCHOR_FILE=/var/lib/unbound/root.key
+export UNBOUND_CONFIG_FILE=/etc/unbound/unbound.conf
+export UNBOUND_CONFIG_SAMPLE_FILE=/templates/unbound.sample.conf
+export UNBOUND_ANCHOR_FILE=/etc/unbound/keys/root.key
 export UNBOUND_BLOCKED_HOSTS_FILE=/etc/unbound/unbound.blocked.hosts
+export ICANN_BUNDLE_FILE=/etc/unbound/keys/icannbundle.pem
 
 printf "|---------------------------------------------------------------------------------------------\n";
 printf "| Starting Unbound DNS Cache Server\n"
@@ -30,23 +32,40 @@ do
     printf "| ENTRYPOINT: Exporting var: $varName\n"
 done
 
-# Lets copy default unbound config file if does not exists
+# Lets copy default unbound config file
 if [[ ! -f ${UNBOUND_CONFIG_FILE} ]]; then
-  cp -rf /unbound-server.conf ${UNBOUND_CONFIG_FILE}
+  cp -rf ${UNBOUND_CONFIG_SAMPLE_FILE} ${UNBOUND_CONFIG_FILE}
 fi
 
-# Lets create initial anchor root.key file if does not exists
-if [[ ! -f ${UNBOUND_ANCHOR_FILE} ]]; then
-  unbound-anchor -a ${UNBOUND_ANCHOR_FILE} || echo
-  # We had to add echo to avoid unbound-anchor command non zero exit from
-  # exiting this script. We have set -e set for this script
-else
-  # file exists, lets check the validity
-  unbound-anchor -a ${UNBOUND_ANCHOR_FILE}
+# lets generate config file by replacing all variables inside of it.
+TMP_FILE=/tmp/unbound.conf
+cp ${UNBOUND_CONFIG_FILE} ${TMP_FILE}
+DOLLAR='$' envsubst < ${TMP_FILE} > ${UNBOUND_CONFIG_FILE}
+rm ${TMP_FILE}
+
+# Lets create keys folder if does not exists
+[[ ! -d /etc/unbound/keys ]] && mkdir -p /etc/unbound/keys
+
+# Lets download icannbundle.pem if it does not exists
+if [[ ! -f ${ICANN_BUNDLE_FILE} ]]; then
+  wget https://data.iana.org/root-anchors/icannbundle.pem -O ${ICANN_BUNDLE_FILE} >/dev/null 2>&1
+  ln -s ${ICANN_BUNDLE_FILE} /etc/unbound/icannbundle.pem
+  ln -s ${ICANN_BUNDLE_FILE} /icannbundle.pem
 fi
+
+# Lets generate certificates if not created already
+if [[ ! -f /etc/unbound/unbound_control.pem || ! -f /etc/unbound/unbound_server.pem ]]; then
+  printf "| ENTRYPOINT: Setting up unbound certificates...\n"
+  unbound-control-setup 2>&1 | sed 's/^/| ENTRYPOINT: Unbound: /g'
+fi
+
+# Lets create or validate root anchor key
+unbound-anchor -a ${UNBOUND_ANCHOR_FILE} || echo
+# We had to add echo to avoid exit due to unbound-anchor command failure. 
+# We have set -e set for this script
 
 # Lets set correct permissions for files used by unbound
-chown unbound:unbound /etc/unbound /var/lib/unbound ${UNBOUND_ANCHOR_FILE}
+chown -Rf unbound:unbound /etc/unbound /etc/unbound/keys
 
 # Setup blocked hosts file if it does not exists
 if [[ ! -f ${UNBOUND_BLOCKED_HOSTS_FILE} ]]; then
@@ -56,9 +75,11 @@ fi
 printf "| ENTRYPOINT: \033[0;31mStarting supervisord (which starts and monitors cron and unbound) \033[0m\n"
 printf "|---------------------------------------------------------------------------------------------\n";
 
-# Lets create cron script for updating host periodically
-printf "SHELL=/bin/bash\nPATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin\n" > /etc/cron.d/updatehosts 
-printf "$UPDATE_BLOCKED_HOSTS_CRON_SETTINGS root /bin/bash $BASH_CMD_FLAGS /scripts/update_blocked_hosts.sh ${UNBOUND_BLOCKED_HOSTS_FILE}\n" >> /etc/cron.d/updatehosts
+# Lets create cron script for updating host daily
+CRON_FILE=/etc/periodic/daily/updatehosts
+printf "#!/bin/bash\nPATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin\n" > ${CRON_FILE}
+printf ". /scripts/update_blocked_hosts.sh ${UNBOUND_BLOCKED_HOSTS_FILE}\n" >> ${CRON_FILE}
+chmod +x ${CRON_FILE}
 
 # Check if app-config is present
 if [ -f /app-config ]; then

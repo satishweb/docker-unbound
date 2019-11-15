@@ -3,7 +3,7 @@
 ## Features
 - DNS Caching using Unbound - unbound.net
 - Block ad hosts from https://raw.githubusercontent.com/StevenBlack/hosts/master/hosts
-- Cron job to update blocked ad hosts every day at 3 AM.
+- Cron job to update blocked ad hosts daily.
 - Support for custom script execution (/app-config)
 
 ## How to use
@@ -25,11 +25,9 @@ services:
     environment:
       DEBUG: "0"
     volumes:
-      # - ./unbound-server.conf:/etc/unbound/unbound.conf.d/unbound-server.conf
+      # - ./unbound.conf:/etc/unbound/unbound.conf # For custom config
       # Mount app-config script with your customizations
       # - ./app-config:/app-config
-      # We need to preserve the root.key that was created by first launch
-      - ./data/unbound/var-lib-unbound:/var/lib/unbound
     deploy:
       replicas: 1
       # placement:

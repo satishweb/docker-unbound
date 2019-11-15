@@ -1,46 +1,30 @@
 # Author: Satish Gaikwad <satish@satishweb.com>
-FROM ubuntu:18.04
+FROM alpine:latest
 LABEL MAINTAINER satish@satishweb.com
 
-#set default env variables
-ENV DEBIAN_FRONTEND=noninteractive \
-    UPDATE_BLOCKED_HOSTS_CRON_SETTINGS='0 3 * * *'
-
-RUN apt-get update \
-    && apt-get -y install \
-        cron \
+RUN apk add \
+        bash \
         supervisor \
         unbound \
-        dnsutils \
-        ldnsutils \
+        drill \
+        gettext \
+        bind-tools \
         sudo \
-        curl \
-        python \
         openssl \
-        ca-certificates \
-        python-pip \
-        wget \
-    && apt-get clean \
-    && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
-
-# Setup rootkeys
-RUN wget https://www.internic.net/domain/named.root -O /etc/unbound/root.hints
+    && rm -rf /etc/unbound/unbound.conf
 
 # Add supervisord.conf
-ADD supervisord.conf /etc/supervisor/conf.d/supervisord.conf
+ADD supervisor-unbound.ini /etc/supervisor.d/supervisor-unbound.ini
 
 # Add scripts and make them executable
-ADD unbound-server.conf /unbound-server.conf
+ADD unbound.sample.conf /templates/unbound.sample.conf
 ADD docker-entrypoint /docker-entrypoint
 COPY scripts /scripts
 RUN chmod u+x /docker-entrypoint /scripts/*
 
-# RUN touch /etc/cron.d/updatehosts
-# RUN chmod u+x /etc/cron.d/updatehosts
-
 # Run the command on container startup
 ENTRYPOINT ["/docker-entrypoint"]
-CMD [ "/usr/bin/supervisord", "-c", "/etc/supervisor/supervisord.conf" ]
+CMD [ "/usr/bin/supervisord", "-n", "-c", "/etc/supervisord.conf" ]
 
 # Healthcheck
-HEALTHCHECK --interval=1m --timeout=30s --start-period=1m CMD drill @127.0.0.1 google.com || exit 1
+HEALTHCHECK --interval=1m --timeout=30s --start-period=10s CMD drill @127.0.0.1 google.com || exit 1
