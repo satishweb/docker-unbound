@@ -50,10 +50,10 @@ services:
 ### Steps
 - Visit https://github.com/satishweb/docker-doh/releases and download latest release to your server
 ```
-wget https://github.com/satishweb/docker-doh/archive/v2.2.1.zip
-unzip v2.2.1.zip
-cp -rf docker-doh-2.2.1/examples/docker-swarm-doh-server doh-server
-rm -rf v2.2.1.zip docker-doh-2.2.1
+wget https://github.com/satishweb/docker-doh/archive/v2.2.2.zip
+unzip v2.2.2.zip
+cp -rf docker-doh-2.2.2/examples/docker-swarm-doh-server doh-server
+rm -rf v2.2.2.zip docker-doh-2.2.2
 cd doh-server
 ```
 - Edit services/cert-manager/docker-service.yml and update below variables

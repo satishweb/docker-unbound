@@ -23,7 +23,8 @@ COPY scripts /scripts
 RUN chmod u+x /docker-entrypoint /scripts/*
 
 # Setup rootkeys
-RUN wget https://www.internic.net/domain/named.root -O /etc/unbound/root.hints
+# Forcing ipv4 as docker builder is not setup with ipv6
+RUN curl  --ipv4 https://www.internic.net/domain/named.root > /etc/unbound/root.hints
 
 # Run the command on container startup
 ENTRYPOINT ["/docker-entrypoint"]
