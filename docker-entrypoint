@@ -48,7 +48,7 @@ rm ${TMP_FILE}
 
 # Lets download icannbundle.pem if it does not exists
 if [[ ! -f ${ICANN_BUNDLE_FILE} ]]; then
-  wget https://data.iana.org/root-anchors/icannbundle.pem -O ${ICANN_BUNDLE_FILE} >/dev/null 2>&1
+  curl https://data.iana.org/root-anchors/icannbundle.pem --output ${ICANN_BUNDLE_FILE} >/dev/null 2>&1
   ln -s ${ICANN_BUNDLE_FILE} /etc/unbound/icannbundle.pem
   ln -s ${ICANN_BUNDLE_FILE} /icannbundle.pem
 fi

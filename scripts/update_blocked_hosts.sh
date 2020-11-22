@@ -20,7 +20,7 @@ checkErr() {
 
 # Download blocked hosts:
 echo "| INFO: Downloading Blocked hosts file... "
-wget https://raw.githubusercontent.com/StevenBlack/hosts/master/hosts --no-check-certificate -O /tmp/hosts >/dev/null 2>&1
+curl https://raw.githubusercontent.com/StevenBlack/hosts/master/hosts --insecure --output /tmp/hosts >/dev/null 2>&1
 checkErr $? "Download failed!"
 
 # Update unbound config
