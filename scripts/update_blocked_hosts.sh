@@ -28,6 +28,14 @@ echo "| INFO: Updating unbound host zones..."
 cat /tmp/hosts | grep '^0\.0\.0\.0' | awk '{print "local-zone: \""$2"\" redirect\nlocal-data: \""$2" A 0.0.0.0\""}' > ${UNBOUND_BLOCKED_HOSTS_FILE}
 chown -Rf unbound:unbound ${UNBOUND_BLOCKED_HOSTS_FILE}
 
+# Remove whitelisted domains from the block list
+if [[ "${DOMAIN_WHITELIST}" != "" ]]; then
+  for i in ${DOMAIN_WHITELIST}
+  do
+    sed "/.*${i}.*/d" ${UNBOUND_BLOCKED_HOSTS_FILE}
+  done
+fi
+
 # Reload config
 if [[ "${2}" != "no-reload" ]]; then
   unbound-control reload >/dev/null 2>&1
