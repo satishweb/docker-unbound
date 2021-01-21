@@ -66,6 +66,7 @@ unbound-anchor -a ${UNBOUND_ANCHOR_FILE} || echo
 
 # Lets set correct permissions for files used by unbound
 chown -Rf unbound:unbound /etc/unbound /etc/unbound/keys
+chmod 644 /etc/unbound/*.conf
 
 # Setup blocked hosts file if it does not exists
 if [[ ! -f ${UNBOUND_BLOCKED_HOSTS_FILE} ]]; then
