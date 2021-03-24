@@ -1,6 +1,7 @@
 IMAGE=satishweb/unbound
 PLATFORMS=linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6
 WORKDIR=$(shell pwd)
+TAGNAME?=devel
 
 ifdef PUSH
 	EXTRA_BUILD_PARAMS = --push-images --push-git-tags
@@ -11,7 +12,16 @@ ifdef LATEST
 endif
 
 all:
-	TAGNAME=$$(${MAKE} latest-version) ;\
+	TAGNAME=$$(docker run --rm --entrypoint=sh alpine -c \
+		"apk update >/dev/null 2>&1; apk info unbound" \
+		|grep -e '^unbound-*.*description'\
+		|awk '{print $$1}'\
+		|sed -e 's/^[ \t]*//;s/[ \t]*$$//;s/ /-/g'\
+		|sed $$'s/[^[:print:]\t]//g'\
+		|sed 's/^unbound-//') ;\
+	${MAKE} build TAGNAME=$$TAGNAME
+
+build:
 	./build.sh \
 	  --image-name "${IMAGE}" \
 	  --platforms "${PLATFORMS}" \
@@ -19,8 +29,12 @@ all:
 	  --git-tag "${TAGNAME}" \
 	  ${EXTRA_BUILD_PARAMS}
 
-latest-version:
-	@docker pull alpine
+test:
+	docker build -t ${IMAGE}:${TAGNAME} .
+
+show-version:
+	@echo -n "Latest unbound version in alpine repo is: "
+	@docker pull alpine >/dev/null 2>&1
 	@docker run --rm --entrypoint=sh alpine -c \
 		"apk update >/dev/null 2>&1; apk info unbound" \
 		|grep -e '^unbound-*.*description'\
