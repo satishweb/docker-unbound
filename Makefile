@@ -27,7 +27,7 @@ all:
 		|sed $$'s/[^[:print:]\t]//g'\
 		|sed 's/^unbound-//' \
 		|cut -d '-' -f 1) ;\
-	${MAKE} build-alpine build-ubuntu TAGNAME=$$TAGNAME
+	${MAKE} build-alpine TAGNAME=$$TAGNAME
 	$(L)TAGNAME=$$(docker run --rm --entrypoint=bash ${UBUNTU_IMAGE} -c \
 		"cat /etc/apt/sources.list|grep -e '.*deb http.*-security universe' > /etc/apt/sources.list.d/security.list && \
 		truncate --size 0 /etc/apt/sources.list && \
