@@ -1,5 +1,6 @@
 IMAGE=satishweb/unbound
-PLATFORMS=linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6
+ALPINE_PLATFORMS=linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6
+UBUNTU_PLATFORMS=linux/amd64,linux/arm/v7
 WORKDIR=$(shell pwd)
 TAGNAME?=devel
 
@@ -42,23 +43,23 @@ all:
 build-alpine:
 	$(L)./build.sh \
 	  --image-name "${IMAGE}" \
-	  --platforms "${PLATFORMS}" \
+	  --platforms "${ALPINE_PLATFORMS}" \
 	  --work-dir "${WORKDIR}" \
-	  --git-tag "alpine-${TAGNAME}" \
+	  --git-tag "${TAGNAME}-alpine" \
 	  --docker-file "Dockerfile.alpine" \
 	  ${EXTRA_BUILD_PARAMS}
 
 build-ubuntu:
 	$(L)./build.sh \
 	  --image-name "${IMAGE}" \
-	  --platforms "${PLATFORMS}" \
+	  --platforms "${UBUNTU_PLATFORMS}" \
 	  --work-dir "${WORKDIR}" \
-	  --git-tag "ubuntu-${TAGNAME}" \
+	  --git-tag "${TAGNAME}-ubuntu" \
 	  --docker-file "Dockerfile.ubuntu" \
-	  ${EXTRA_BUILD_PARAMS} --mark-latest=no
+	  $$(echo ${EXTRA_BUILD_PARAMS}|sed 's/--mark-latest//')
 
 test:
-	$(L)docker build -t ${IMAGE}:${TAGNAME} .
+	$(L)docker build -t ${IMAGE}:${TAGNAME} -f ./Dockerfile.${OSF}
 
 show-version:
 	$(L)echo -n "Latest unbound version in alpine repo is: "
