@@ -34,7 +34,7 @@ RUN curl --ipv4 https://www.internic.net/domain/named.root > /etc/unbound/root.h
 
 # Run the command on container startup
 ENTRYPOINT ["/docker-entrypoint"]
-CMD [ "/usr/bin/supervisord", "-n", "-c", "/etc/supervisord.conf" ]
+CMD [ "/usr/bin/supervisord", "-n", "-c", "/etc/supervisor/supervisord.conf" ]
 
 # Healthcheck
 HEALTHCHECK --interval=1m --timeout=30s --start-period=10s CMD drill @127.0.0.1 google.com || exit 1
