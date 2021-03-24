@@ -104,11 +104,10 @@ __dockerBuild(){
 
   tagParams=""
   # Add os flavor as tag
-  OSF=$(${dockerFile}|cut -d '.' -f 2)
+  OSF=$(echo ${dockerFile}|cut -d '.' -f 2)
   [[ "${OSF}" != "" ]] && tagParams=" -t $1:${OSF}"
   for i in $2; do tagParams+=" -t $1:$i"; done
-  echo docker buildx build --platform "$3" $5 $tagParams $4/$dockerFile
-  exit 1
+  docker buildx build --platform "$3" $5 $tagParams -f $4/$dockerFile .
   __errCheck "$?" "Docker Build failed"
 }
 
