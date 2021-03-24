@@ -11,6 +11,9 @@ if [ "$DEBUG" = "1" ]; then
     BASH_CMD_FLAGS='-x'
 fi
 
+# Lets determine the OS flavor
+OSF=$(cat /etc/os-release|grep -e '^ID=.*'|cut -d '=' -f 2)
+
 UNBOUND_CONFIG_DIR=/etc/unbound
 export UNBOUND_CONFIG_FILE=${UNBOUND_CONFIG_DIR}/unbound.conf
 export UNBOUND_CONFIG_SAMPLE_FILE=/templates/unbound.sample.conf
@@ -85,7 +88,17 @@ printf "| ENTRYPOINT: \033[0;31mStarting supervisord (which starts and monitors 
 printf "|---------------------------------------------------------------------------------------------\n";
 
 # Lets create cron script for updating host daily
-CRON_FILE=/etc/periodic/daily/updatehosts
+if [[ "$OSF" == "ubuntu" ]]; then
+  rm -rf /etc/cron.daily/*
+  CRON_FILE=/etc/cron.daily/updatehosts
+elif [[ "$OSF" == "alpine" ]]; then
+  CRON_FILE=/etc/periodic/daily/updatehosts
+else
+  echo "Error: We support only alpine and ubuntu flavors right now"
+  sleep 10
+  exit 1
+fi
+
 printf "#!/bin/bash\nPATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin\n" > ${CRON_FILE}
 printf ". /scripts/update_blocked_hosts.sh ${UNBOUND_BLOCKED_HOSTS_FILE}\n" >> ${CRON_FILE}
 chmod +x ${CRON_FILE}
