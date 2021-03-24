@@ -87,6 +87,7 @@ __processParams() {
   [[ ! $tagName ]] && __usage "Work dir path missing"
   [[ ! $workDir ]] && workDir=$(pwd)
   [[ ! $image ]] && image=$(basename $(pwd))
+  OSF=$(echo ${dockerFile}|cut -d '.' -f 2)
 }
 
 __errCheck(){
@@ -103,9 +104,6 @@ __dockerBuild(){
   # $5 = Extra args for docker buildx command
 
   tagParams=""
-  # Add os flavor as tag
-  OSF=$(echo ${dockerFile}|cut -d '.' -f 2)
-  [[ "${OSF}" != "" ]] && tagParams=" -t $1:${OSF}"
   for i in $2; do tagParams+=" -t $1:$i"; done
   docker buildx build --platform "$3" $5 $tagParams -f $4/$dockerFile .
   __errCheck "$?" "Docker Build failed"
@@ -171,10 +169,9 @@ echo "INFO: Building Docker Images (may take a while)"
 echo "INFO: Docker image      : $image"
 echo "INFO: Platforms         : $platforms"
 echo "INFO: DockerFile        : $dockerFile"
-echo "INFO: Docker Args       : $dockerArgs"
-echo "INFO: Docker image tags : $imageTags"
+echo "INFO: Docker image tags : $imageTags $OSF"
 echo "INFO: Image tags push?  : $imgPush"
 echo "INFO: Git tags          : $tagName"
 echo "INFO: Git tags push?    : $tagPush"
-__dockerBuild $image "$imageTags" "$platforms" "$workDir" "$extraDockerArgs"
+__dockerBuild $image "$imageTags $OSF" "$platforms" "$workDir" "$extraDockerArgs"
 __createGitTag $tagName
