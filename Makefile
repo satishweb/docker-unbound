@@ -20,6 +20,7 @@ all:
 	  ${EXTRA_BUILD_PARAMS}
 
 latest-version:
+	@docker pull alpine
 	@docker run --rm --entrypoint=sh alpine -c \
 		"apk update >/dev/null 2>&1; apk info unbound" \
 		|grep -e '^unbound-*.*description'\
