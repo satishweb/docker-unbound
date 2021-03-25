@@ -25,7 +25,7 @@ echo "Current Version of Unbound in Alpine is: ${CURRENT_UNBOUND_VERSION}" >> ${
 docker pull ${DOCKER_HUB_IMAGE} 2>&1 >/dev/null
 IMAGE_ID=$(docker images|grep "${DOCKER_HUB_IMAGE}"|grep latest|awk '{print $3}')
 
-CURRENT_IMAGE_TAG=$(/opt/sources/docker-script-find-latest-image-tag/docker_image_find_tag.sh -n ${DOCKER_HUB_IMAGE} -i ${IMAGE_ID} -f 1. -l 5|grep 'Found match. tag:'|awk -F '[:]' '{print $2}'| sed 's/ //g')
+CURRENT_IMAGE_TAG=$(/opt/sources/docker-script-find-latest-image-tag/docker_image_find_tag.sh -n ${DOCKER_HUB_IMAGE} -i ${IMAGE_ID} -f 1. -l 5|grep 'Found match. tag:'|awk -F '[:]' '{print $2}'| sed 's/ //g'|awk -F '[-]' '{print $1}')
 echo "Current Version of Unbound Image is: ${CURRENT_IMAGE_TAG}" >> ${LOG_FILE}
 
 if [[ "${CURRENT_IMAGE_TAG}" != "${CURRENT_UNBOUND_VERSION}" ]]; then
