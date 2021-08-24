@@ -3,7 +3,6 @@ FROM alpine:latest
 LABEL MAINTAINER satish@satishweb.com
 
 RUN apk add \
-        bash \
         supervisor \
         unbound \
         drill \

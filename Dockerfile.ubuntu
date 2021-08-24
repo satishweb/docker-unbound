@@ -5,7 +5,6 @@ LABEL MAINTAINER satish@satishweb.com
 ENV DEBIAN_FRONTEND noninteractive
 
 RUN apt-get update && apt-get -y install \
-        bash \
         supervisor \
         unbound \
         ldnsutils \
