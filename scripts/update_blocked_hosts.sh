@@ -1,9 +1,9 @@
-#!/bin/bash
+#!/bin/sh
 # Author: Satish Gaikwad <satish@satishweb.com>
 
 . /etc/profile
 
-if [[ "$1" == "" ]]; then
+if [ "$1" == "" ]; then
   UNBOUND_BLOCKED_HOSTS_FILE=/etc/unbound/unbound.blocked.hosts
 else
   UNBOUND_BLOCKED_HOSTS_FILE="$1"
@@ -29,7 +29,7 @@ cat /tmp/hosts | grep '^0\.0\.0\.0' | awk '{print "local-zone: \""$2"\" redirect
 chown -Rf unbound:unbound ${UNBOUND_BLOCKED_HOSTS_FILE}
 
 # Remove whitelisted domains from the block list
-if [[ "${DOMAIN_WHITELIST}" != "" ]]; then
+if [ "${DOMAIN_WHITELIST}" != "" ]; then
   for i in ${DOMAIN_WHITELIST}
   do
     sed "/.*${i}.*/d" ${UNBOUND_BLOCKED_HOSTS_FILE}

@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 # Author: Satish Gaikwad <satish@satishweb.com>
 set -e
 
@@ -38,12 +38,12 @@ do
 done
 
 # Lets copy default unbound config file
-if [[ ! -f ${UNBOUND_CONFIG_FILE} ]]; then
+if [ ! -f ${UNBOUND_CONFIG_FILE} ]; then
   cp -rf ${UNBOUND_CONFIG_SAMPLE_FILE} ${UNBOUND_CONFIG_FILE}
 fi
 
 # Lets create custom hosts file if not present
-if [[ ! -f ${UNBOUND_CUSTOM_HOSTS_FILE} ]]; then
+if [ ! -f ${UNBOUND_CUSTOM_HOSTS_FILE} ]; then
   mkdir -p ${UNBOUND_CONFIG_DIR}/custom/
   touch ${UNBOUND_CUSTOM_HOSTS_FILE}
 fi
@@ -58,14 +58,14 @@ rm ${TMP_FILE}
 [[ ! -d ${UNBOUND_CONFIG_DIR}/keys ]] && mkdir -p ${UNBOUND_CONFIG_DIR}/keys
 
 # Lets download icannbundle.pem if it does not exists
-if [[ ! -f ${ICANN_BUNDLE_FILE} ]]; then
+if [ ! -f ${ICANN_BUNDLE_FILE} ]; then
   curl https://data.iana.org/root-anchors/icannbundle.pem --output ${ICANN_BUNDLE_FILE} >/dev/null 2>&1
   ln -s ${ICANN_BUNDLE_FILE} ${UNBOUND_CONFIG_DIR}/icannbundle.pem
   ln -s ${ICANN_BUNDLE_FILE} /icannbundle.pem
 fi
 
 # Lets generate certificates if not created already
-if [[ ! -f ${UNBOUND_CONFIG_DIR}/unbound_control.pem || ! -f ${UNBOUND_CONFIG_DIR}/unbound_server.pem ]]; then
+if [ ! -f ${UNBOUND_CONFIG_DIR}/unbound_control.pem ] || [ ! -f ${UNBOUND_CONFIG_DIR}/unbound_server.pem ]; then
   printf "| ENTRYPOINT: Setting up unbound certificates...\n"
   unbound-control-setup 2>&1 | sed 's/^/| ENTRYPOINT: Unbound: /g'
 fi
@@ -80,18 +80,18 @@ chown -Rf unbound:unbound ${UNBOUND_CONFIG_DIR} ${UNBOUND_CONFIG_DIR}/keys
 chmod 644 ${UNBOUND_CONFIG_DIR}/*.conf
 
 # Setup blocked hosts file if it does not exists
-if [[ ! -f ${UNBOUND_BLOCKED_HOSTS_FILE} ]]; then
-  /bin/bash $BASH_CMD_FLAGS /scripts/update_blocked_hosts.sh "${UNBOUND_BLOCKED_HOSTS_FILE}" no-reload
+if [ ! -f ${UNBOUND_BLOCKED_HOSTS_FILE} ]; then
+  /bin/sh $BASH_CMD_FLAGS /scripts/update_blocked_hosts.sh "${UNBOUND_BLOCKED_HOSTS_FILE}" no-reload
 fi
 
 printf "| ENTRYPOINT: \033[0;31mStarting supervisord (which starts and monitors cron and unbound) \033[0m\n"
 printf "|---------------------------------------------------------------------------------------------\n";
 
 # Lets create cron script for updating host daily
-if [[ "$OSF" == "ubuntu" ]]; then
+if [ "$OSF" == "ubuntu" ]; then
   rm -rf /etc/cron.daily/*
   CRON_FILE=/etc/cron.daily/updatehosts
-elif [[ "$OSF" == "alpine" ]]; then
+elif [ "$OSF" == "alpine" ]; then
   CRON_FILE=/etc/periodic/daily/updatehosts
 else
   echo "Error: We support only alpine and ubuntu flavors right now"
