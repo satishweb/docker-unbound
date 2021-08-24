@@ -3,6 +3,7 @@ ALPINE_PLATFORMS=linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6
 UBUNTU_PLATFORMS=linux/amd64,linux/arm/v7
 WORKDIR=$(shell pwd)
 TAGNAME?=devel
+OSF?=alpine
 
 # Set L to + for debug
 L=@
@@ -59,7 +60,7 @@ build-ubuntu:
 	  $$(echo ${EXTRA_BUILD_PARAMS}|sed 's/--mark-latest//')
 
 test:
-	$(L)docker build -t ${IMAGE}:${TAGNAME} -f ./Dockerfile.${OSF}
+	$(L)docker build -t ${IMAGE}:${TAGNAME} -f ./Dockerfile.${OSF} .
 
 show-version:
 	$(L)echo -n "Latest unbound version in alpine repo is: "

@@ -11,6 +11,7 @@ RUN apk add \
         bind-tools \
         sudo \
         openssl \
+        curl \
     && rm -rf /etc/unbound/unbound.conf /etc/unbound/root.hints
 
 # Add supervisord.conf
