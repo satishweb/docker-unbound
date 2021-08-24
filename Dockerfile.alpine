@@ -21,6 +21,7 @@ ADD unbound.sample.conf /templates/unbound.sample.conf
 ADD docker-entrypoint /docker-entrypoint
 COPY scripts /scripts
 RUN chmod u+x /docker-entrypoint /scripts/*
+RUN mkdir -p /etc/unbound/keys /etc/unbound/custom
 
 # Setup rootkeys
 # Forcing ipv4 as docker builder is not setup with ipv6
