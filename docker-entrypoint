@@ -25,14 +25,14 @@ export ICANN_BUNDLE_FILE=${UNBOUND_CONFIG_DIR}/keys/icannbundle.pem
 printf "|---------------------------------------------------------------------------------------------\n";
 printf "| Starting Unbound DNS Cache Server\n"
 
-export SOURCE_StevenBlack_Unified_Hosts=true
-export SOURCE_StevenBlack_Fakenews=true
-export SOURCE_StevenBlack_Gambling=true
-export SOURCE_StevenBlack_Porn=true
-export SOURCE_TheGreatWall_Default=true
-export SOURCE_AdWars_Default=true
-export SOURCE_VeleSila_Default=true
-export SOURCE_Tiuxo_Default=true
+export ${SOURCE_StevenBlack_Unified_Hosts:=true}
+export ${SOURCE_StevenBlack_Fakenews:=true}
+export ${SOURCE_StevenBlack_Gambling:=true}
+export ${SOURCE_StevenBlack_Porn:=true}
+export ${SOURCE_TheGreatWall_Default:=true}
+export ${SOURCE_AdWars_Default:=true}
+export ${SOURCE_VeleSila_Default:=true}
+export ${SOURCE_Tiuxo_Default:=true}
 
 # Load env vars
 printf "| ENTRYPOINT: \033[0;31mLoading docker secrets if found...\033[0m\n"
