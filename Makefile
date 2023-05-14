@@ -33,7 +33,7 @@ endif
 all: build
 
 build:
-	/bin/bash -x ./build.sh \
+	/bin/bash ${BASH_FLAGS} ./build.sh \
 	  --image-name "${IMAGE}" \
 	  --platforms "${PLATFORMS}" \
 	  --work-dir "${WORKDIR}" \
