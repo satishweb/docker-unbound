@@ -1,15 +1,22 @@
 IMAGE=satishweb/unbound
-ALPINE_PLATFORMS=linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6
-UBUNTU_PLATFORMS=linux/amd64,linux/arm/v7
+PLATFORMS=linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6
 WORKDIR=$(shell pwd)
-TAGNAME?=devel
-OSF?=alpine
+BASE_IMAGE=alpine:latest
+
+UNBOUND_VERSION?=$(shell docker run --rm --entrypoint=sh ${BASE_IMAGE} -c \
+					"apk update >/dev/null 2>&1; apk info unbound" \
+					|grep -e '^unbound-*.*description'\
+					|awk '{print $$1}'\
+					|sed -e 's/^[ \t]*//;s/[ \t]*$$//;s/ /-/g'\
+					|sed $$'s/[^[:print:]\t]//g'\
+					|sed 's/^unbound-//')
 
 # Set L to + for debug
 L=@
 
-UBUNTU_IMAGE=ubuntu:20.04
-ALPINE_IMAGE=alpine:latest
+test-env:
+	echo "test-env: printing env values:"
+	echo "Unbound Version: ${UNBOUND_VERSION}"
 
 ifdef PUSH
 	EXTRA_BUILD_PARAMS = --push-images --push-git-tags
@@ -19,69 +26,20 @@ ifdef LATEST
 	EXTRA_BUILD_PARAMS += --mark-latest
 endif
 
-all:
-	$(L)TAGNAME=$$(docker run --rm --entrypoint=sh ${ALPINE_IMAGE} -c \
-		"apk update >/dev/null 2>&1; apk info unbound" \
-		|grep -e '^unbound-*.*description'\
-		|awk '{print $$1}'\
-		|sed -e 's/^[ \t]*//;s/[ \t]*$$//;s/ /-/g'\
-		|sed $$'s/[^[:print:]\t]//g'\
-		|sed 's/^unbound-//' \
-		|cut -d '-' -f 1) ;\
-	${MAKE} build-alpine TAGNAME=$$TAGNAME
-	$(L)TAGNAME=$$(docker run --rm --entrypoint=bash ${UBUNTU_IMAGE} -c \
-		"cat /etc/apt/sources.list|grep -e '.*deb http.*-security universe' > /etc/apt/sources.list.d/security.list && \
-		truncate --size 0 /etc/apt/sources.list && \
-		apt update -yqq>/dev/null 2>&1 && \
-		apt-get update -yqq >/dev/null 2>&1 && \
-		apt-cache madison unbound \
-		|head -1 \
-		|cut -d \| -f 2 \
-		|sed 's/ //g' \
-		|cut -d '-' -f 1") ;\
-	${MAKE} build-ubuntu TAGNAME=$$TAGNAME
+ifdef LOAD
+	EXTRA_BUILD_PARAMS += --load
+endif
 
-build-alpine:
-	$(L)./build.sh \
-	  --image-name "${IMAGE}" \
-	  --platforms "${ALPINE_PLATFORMS}" \
-	  --work-dir "${WORKDIR}" \
-	  --git-tag "${TAGNAME}-alpine" \
-	  --docker-file "Dockerfile.alpine" \
-	  ${EXTRA_BUILD_PARAMS}
+all: build
 
-build-ubuntu:
-	$(L)./build.sh \
+build:
+	/bin/bash -x ./build.sh \
 	  --image-name "${IMAGE}" \
-	  --platforms "${UBUNTU_PLATFORMS}" \
+	  --platforms "${PLATFORMS}" \
 	  --work-dir "${WORKDIR}" \
-	  --git-tag "${TAGNAME}-ubuntu" \
-	  --docker-file "Dockerfile.ubuntu" \
-	  $$(echo ${EXTRA_BUILD_PARAMS}|sed 's/--mark-latest//')
+	  --git-tag "${UNBOUND_VERSION}" \
+	  --extra-args "--build-arg UNBOUND_VERSION=${UNBOUND_VERSION}" \
+	${EXTRA_BUILD_PARAMS}
 
 test:
-	$(L)docker build -t ${IMAGE}:${TAGNAME} -f ./Dockerfile.${OSF} .
-
-show-version:
-	$(L)echo -n "Latest unbound version in alpine repo is: "
-	$(L)docker pull ${ALPINE_IMAGE} >/dev/null 2>&1
-	$(L)docker run --rm --entrypoint=sh ${ALPINE_IMAGE} -c \
-		"apk update >/dev/null 2>&1; apk info unbound" \
-		|grep -e '^unbound-*.*description'\
-		|awk '{print $$1}'\
-		|sed -e 's/^[ \t]*//;s/[ \t]*$$//;s/ /-/g'\
-		|sed $$'s/[^[:print:]\t]//g'\
-		|sed 's/^unbound-//' \
-		|cut -d '-' -f 1
-	$(L)echo -n "Latest unbound version in ubuntu repo is: "
-	$(L)docker pull ${UBUNTU_IMAGE} >/dev/null 2>&1
-	$(L)docker run --rm --entrypoint=bash ${UBUNTU_IMAGE} -c \
-		"cat /etc/apt/sources.list|grep -e '.*deb http.*-security universe' > /etc/apt/sources.list.d/security.list && \
-		truncate --size 0 /etc/apt/sources.list && \
-		apt update -yqq>/dev/null 2>&1 && \
-		apt-get update -yqq >/dev/null 2>&1 && \
-		apt-cache madison unbound \
-		|head -1 \
-		|cut -d \| -f 2 \
-		|sed 's/ //g' \
-		|cut -d '-' -f 1"
+	docker build --build-arg UNBOUND_VERSION=${UNBOUND_VERSION} -t ${IMAGE}:${UNBOUND_VERSION} .

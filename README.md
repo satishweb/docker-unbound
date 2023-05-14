@@ -2,7 +2,12 @@
 
 ## Features
 - DNS Caching using Unbound - unbound.net
-- Block ad hosts listed in https://raw.githubusercontent.com/StevenBlack/hosts/master/hosts
+- Block ad hosts listed in:
+  - https://github.com/StevenBlack/: Unified list + Fakenews + Gambling + P*rn
+  - https://raw.githubusercontent.com/Sekhan/TheGreatWall/master/TheGreatWall.txt
+  - https://raw.githubusercontent.com/jdlingyu/ad-wars/master/hosts
+  - https://raw.githubusercontent.com/VeleSila/yhosts/master/hosts
+  - https://raw.githubusercontent.com/tiuxo/hosts/master/ads
 - Cron job to update blocked ad hosts daily.
 - Support for custom script execution (/app-config)
 - Support for linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6
@@ -28,6 +33,14 @@ services:
     environment:
       DEBUG: "0"
       # DOMAIN_WHITELIST: "domain1.com domain2.com subdomain.domain3.com"
+      SOURCE_StevenBlack_Unified_Hosts: "true"
+      SOURCE_StevenBlack_Fakenews: "true"
+      SOURCE_StevenBlack_Gambling: "true"
+      SOURCE_StevenBlack_Porn: "true"
+      SOURCE_TheGreatWall_Default: "true"
+      SOURCE_AdWars_Default: "true"
+      SOURCE_VeleSila_Default: "true"
+      SOURCE_Tiuxo_Default: "true"
     volumes:
       # - ./unbound.conf:/etc/unbound/unbound.conf # For custom config
       # Mount app-config script with your customizations
@@ -51,10 +64,10 @@ services:
 ### Steps
 - Visit https://github.com/satishweb/docker-doh/releases and download latest release to your server
 ```bash
-wget https://github.com/satishweb/docker-doh/archive/v2.2.4-1.zip
-unzip v2.2.4-1.zip
+wget https://github.com/satishweb/docker-doh/archive/v2.3.3.zip
+unzip v2.3.3.zip
 cp -rf docker-doh-2.2.4-1/examples/docker-compose-doh-server doh-server
-rm -rf v2.2.4-1.zip docker-doh-2.2.4-1
+rm -rf v2.3.3.zip docker-doh-2.2.4-1
 cd doh-server
 ```
 - Copy env.sample.conf to env.conf and update environment variables

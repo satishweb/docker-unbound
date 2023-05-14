@@ -25,6 +25,15 @@ export ICANN_BUNDLE_FILE=${UNBOUND_CONFIG_DIR}/keys/icannbundle.pem
 printf "|---------------------------------------------------------------------------------------------\n";
 printf "| Starting Unbound DNS Cache Server\n"
 
+export SOURCE_StevenBlack_Unified_Hosts=true
+export SOURCE_StevenBlack_Fakenews=true
+export SOURCE_StevenBlack_Gambling=true
+export SOURCE_StevenBlack_Porn=true
+export SOURCE_TheGreatWall_Default=true
+export SOURCE_AdWars_Default=true
+export SOURCE_VeleSila_Default=true
+export SOURCE_Tiuxo_Default=true
+
 # Load env vars
 printf "| ENTRYPOINT: \033[0;31mLoading docker secrets if found...\033[0m\n"
 for i in $(env|grep '/run/secrets')
@@ -55,7 +64,9 @@ DOLLAR='$' envsubst < ${TMP_FILE} > ${UNBOUND_CONFIG_FILE}
 rm ${TMP_FILE}
 
 # Lets create keys folder if does not exists
-[[ ! -d ${UNBOUND_CONFIG_DIR}/keys ]] && mkdir -p ${UNBOUND_CONFIG_DIR}/keys
+if [ ! -d ${UNBOUND_CONFIG_DIR}/keys ]; then
+  mkdir -p ${UNBOUND_CONFIG_DIR}/keys
+fi
 
 # Lets download icannbundle.pem if it does not exists
 if [ ! -f ${ICANN_BUNDLE_FILE} ]; then
@@ -88,15 +99,15 @@ printf "| ENTRYPOINT: \033[0;31mStarting supervisord (which starts and monitors 
 printf "|---------------------------------------------------------------------------------------------\n";
 
 # Lets create cron script for updating host daily
-if [ "$OSF" == "ubuntu" ]; then
+if [ "$OSF" = "ubuntu" ]; then
   rm -rf /etc/cron.daily/*
   CRON_FILE=/etc/cron.daily/updatehosts
-elif [ "$OSF" == "alpine" ]; then
+elif [ "$OSF" = "alpine" ]; then
   CRON_FILE=/etc/periodic/daily/updatehosts
 else
   echo "Error: We support only alpine and ubuntu flavors right now"
-  sleep 10
-  exit 1
+  sleep 1000000000
+  #exit 1
 fi
 
 printf "#!/bin/bash\nPATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin\n" > ${CRON_FILE}

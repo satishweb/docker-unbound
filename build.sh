@@ -11,10 +11,12 @@ __usage() {
           -p|--platforms <PlatformsList>
           -w|--work-dir <WorkDirPath>
           -t|--git-tag <TagName(Required)>
+          -a|--extra-args <ExtraArgsForDockerBuildCommand>
           --mark-latest
           --push-images
           --push-git-tags
           --no-cache
+          --load
           -h|--help"
   echo "Description:"
   echo "  -i|--image-name : Name of the docker image."
@@ -23,12 +25,12 @@ __usage() {
   echo "    (Def: linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6)"
   echo "  -w|--work-dir   : Docker buildx command work dir path"
   echo "  -t|--git-tag    : Name for git tag to create (Required)"
+  echo "  -a|--extra-args : Extra docker buidl args to pass to docker build command"
   echo "  --mark-latest   : Marks the latest image to given tag"
   echo "  --push-images   : Enables pushing of docker images to docker hub"
   echo "  --push-git-tags : Enabled push of git tags to git remote origin"
   echo "  --no-cache      : Avoid use of docker build cache"
-  echo "  --docker-file   : Path to the docker file from working dir"
-  echo "  --docker-args   : Additional docker command arguments to supply"
+  echo "  --load          : Make locally built images available to build"
   echo "  -h|--help       : Prints this help menu"
   exit 1
 }
@@ -36,7 +38,6 @@ __usage() {
 __processParams() {
   extraDockerArgs=""
   imageTags=""
-  dockerFile=Dockerfile
   while [ "$1" != "" ]; do
     case $1 in
       -i|--image-name) shift
@@ -53,13 +54,16 @@ __processParams() {
                        ;;
       -t|--git-tag)    shift
                        [[ ! $1 ]] && __usage "Git tag name missing"
-                       tagName="$(echo $1\
+                       tagName="$(echo "$1"\
                        |sed -e 's/^[ \t]*//;s/[ \t]*$//;s/ /-/g'\
                        |sed $'s/[^[:print:]\t]//g')"
                        imageTags+=" $tagName"
                        ;;
-      --mark-latest)   latestImage=yes
-                       imageTags+=" latest"
+      -a|--extra-args)    shift
+                       [[ ! $1 ]] && __usage "extra args missing"
+                       extraDockerArgs+=" $1"
+                       ;;
+      --mark-latest)   imageTags+=" latest"
                        ;;
       --push-images)   imgPush=yes
                        ;;
@@ -67,12 +71,7 @@ __processParams() {
                        ;;
       --no-cache)      extraDockerArgs+=" --no-cache"
                        ;;
-      --docker-file)   shift
-                       dockerFile="$1"
-                       ;;
-      --docker-args)   shift
-                       dockerArgs=$1
-                       extraDockerArgs+=" dockerArgs"
+      --load)      extraDockerArgs+=" --load"
                        ;;
       -h|--help)       __usage
                        ;;
@@ -85,15 +84,14 @@ __processParams() {
   [[ ! $imgPush ]] && imgPush=no
   [[ ! $tagPush ]] && tagPush=no
   [[ ! $tagName ]] && __usage "Work dir path missing"
-  [[ ! $workDir ]] && workDir=$(pwd)
-  [[ ! $image ]] && image=$(basename $(pwd))
-  OSF=$(echo ${dockerFile}|cut -d '.' -f 2)
+  [[ ! $workDir ]] && workDir="$(pwd)"
+  [[ ! $image ]] && image=$(basename "$(pwd)")
 }
 
 __errCheck(){
   # $1 = errocode
   # $2 = msg
-  [[ "$1" != "0" ]] && echo "ERR: $2" && exit $1
+  [[ "$1" != "0" ]] && echo "ERR: $2" && exit "$1"
 }
 
 __dockerBuild(){
@@ -105,7 +103,8 @@ __dockerBuild(){
 
   tagParams=""
   for i in $2; do tagParams+=" -t $1:$i"; done
-  docker buildx build --platform "$3" $5 $tagParams -f $4/$dockerFile .
+  # shellcheck disable=SC2086
+  sudo docker buildx build --platform "$3" $5 $tagParams "$4"
   __errCheck "$?" "Docker Build failed"
 }
 
@@ -114,9 +113,8 @@ __validations() {
   ! [[ "$tagPush" =~ ^(yes|no)$ ]] && tagPush=no
 
   # Check for buildx env
-  if [[ "$(docker buildx ls\
-           |grep -e " *default*.*running linux/amd64"\
-           |wc -l\
+  if [[ "$(sudo docker buildx ls\
+           |grep -ce '.*default.*running.*linux/amd64' \
           )" -lt "1" ]]; then
     __errCheck "1" "Docker buildx env is not setup, please fix it"
   fi
@@ -125,10 +123,10 @@ __validations() {
 __checkSource() {
   # Lets do git pull if push is enabled
   if [[ "$imgPush" == "yes" ]]; then
-    git checkout master >/dev/null 2>&1
-    __errCheck "$?" "Git checkout to master branch failed..."
+    git checkout main >/dev/null 2>&1
+    __errCheck "$?" "Git checkout to main branch failed..."
     git pull >/dev/null 2>&1
-    __errCheck "$?" "Git pull for master branch failed..."
+    __errCheck "$?" "Git pull for main branch failed..."
   fi
 }
 
@@ -136,29 +134,29 @@ __setupDocker() {
   # Lets prepare docker image
   if [[ "$imgPush" == "yes" ]]; then
     echo "INFO: Logging in to Docker HUB... (Interactive Mode)"
-    docker login 2>&1 | sed 's/^/INFO: DOCKER: /g'
+    sudo docker login 2>&1 | sed 's/^/INFO: DOCKER: /g'
     __errCheck "$?" "Docker login failed..."
     extraDockerArgs+=" --push"
   fi
-  docker buildx create --name builder >/dev/null 2>&1
-  docker buildx use builder >/dev/null 2>&1
+  sudo docker buildx create --name builder >/dev/null 2>&1
+  sudo docker buildx use builder >/dev/null 2>&1
   __errCheck "$?" "Could not use docker buildx default runner..."
 }
 
 __createGitTag() {
   # Lets create git tag
   echo "INFO: Creating local git tag: $tagName"
-  git tag -d $tagName >/dev/null 2>&1
-  git tag $tagName >/dev/null 2>&1
+  git tag -d "$tagName" >/dev/null 2>&1
+  git tag "$tagName" >/dev/null 2>&1
   if [[ "$tagPush" == "yes" ]]; then
     echo "INFO: Pushing git tag to remote: $tagName"
-    git push --delete origin $tagName >/dev/null 2>&1
-    git push -f origin $tagName >/dev/null 2>&1
+    git push --delete origin "$tagName" >/dev/null 2>&1
+    git push -f origin "$tagName" >/dev/null 2>&1
   fi
 }
 
 ## Main
-__processParams $@
+__processParams "$@"
 __validations
 __checkSource
 __setupDocker
@@ -168,10 +166,9 @@ __setupDocker
 echo "INFO: Building Docker Images (may take a while)"
 echo "INFO: Docker image      : $image"
 echo "INFO: Platforms         : $platforms"
-echo "INFO: DockerFile        : $dockerFile"
-echo "INFO: Docker image tags : $imageTags $OSF"
+echo "INFO: Docker image tags : $imageTags"
 echo "INFO: Image tags push?  : $imgPush"
 echo "INFO: Git tags          : $tagName"
 echo "INFO: Git tags push?    : $tagPush"
-__dockerBuild $image "$imageTags $OSF" "$platforms" "$workDir" "$extraDockerArgs"
-__createGitTag $tagName
+__dockerBuild "$image" "$imageTags" "$platforms" "$workDir" "$extraDockerArgs"
+__createGitTag "$tagName"
