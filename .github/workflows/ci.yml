@@ -78,7 +78,21 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Is the dependency graph of the repository available?
+        id: graph
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          if gh api "repos/${GITHUB_REPOSITORY}/dependency-graph/sbom" >/dev/null 2>&1; then
+            echo "available=true" >> "${GITHUB_OUTPUT}"
+          else
+            echo "available=false" >> "${GITHUB_OUTPUT}"
+            echo "::notice::The dependency graph of the repository is not enabled, the dependencies of the pull request are not reviewed. It can be enabled in the settings of the repository."
+          fi
+
       - name: Review the dependencies of the pull request
+        if: steps.graph.outputs.available == 'true'
         uses: actions/dependency-review-action@v4
 
   shellcheck:
