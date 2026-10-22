@@ -110,11 +110,14 @@ if [ ! -d "${UNBOUND_CONFIG_DIR}/keys" ]; then
   mkdir -p "${UNBOUND_CONFIG_DIR}/keys"
 fi
 
-# Lets download icannbundle.pem if it does not exists
+# The certificate authority of the internet and the control certificates of
+# the resolver are prepared while the image is built. They are only created
+# here when they are missing, for example when a volume is mounted over the
+# configuration directory.
 if [ ! -f "${ICANN_BUNDLE_FILE}" ]; then
-  curl https://data.iana.org/root-anchors/icannbundle.pem --output "${ICANN_BUNDLE_FILE}" >/dev/null 2>&1
-  ln -s "${ICANN_BUNDLE_FILE}" "${UNBOUND_CONFIG_DIR}/icannbundle.pem"
-  ln -s "${ICANN_BUNDLE_FILE}" /icannbundle.pem
+  curl -fsSL https://data.iana.org/root-anchors/icannbundle.pem --output "${ICANN_BUNDLE_FILE}" >/dev/null 2>&1
+  ln -sf "${ICANN_BUNDLE_FILE}" "${UNBOUND_CONFIG_DIR}/icannbundle.pem"
+  ln -sf "${ICANN_BUNDLE_FILE}" /icannbundle.pem
 fi
 
 # Lets generate certificates if not created already
@@ -131,7 +134,7 @@ unbound-anchor -a "${UNBOUND_ANCHOR_FILE}" || echo
 # Lets set correct permissions for files used by unbound
 chown -Rf unbound:unbound "${UNBOUND_CONFIG_DIR}" "${UNBOUND_CONFIG_DIR}/keys" 2>/dev/null || \
   __warn "Could not change the owner of ${UNBOUND_CONFIG_DIR}, continuing."
-chmod 644 "${UNBOUND_CONFIG_DIR}"/*.conf
+chmod 644 "${UNBOUND_CONFIG_DIR}"/*.conf 2>/dev/null || true
 
 # Setup blocked hosts file if it does not exists
 if [ ! -f "${UNBOUND_BLOCKED_HOSTS_FILE}" ]; then

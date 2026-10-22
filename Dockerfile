@@ -38,6 +38,17 @@ RUN chmod u+x /docker-entrypoint /docker-healthcheck /scripts/* \
 # Forcing ipv4 as docker builder is not setup with ipv6
 RUN curl  --ipv4 https://www.internic.net/domain/named.root > /etc/unbound/root.hints
 
+# The certificate authority of the internet, the control certificates of the
+# resolver and the root anchor key are prepared while the image is built. The
+# container does not have to download them when it starts, it does not need
+# the network and it does not need the root rights for it.
+RUN curl -fsSL https://data.iana.org/root-anchors/icannbundle.pem \
+        --output /etc/unbound/keys/icannbundle.pem \
+    && ln -s /etc/unbound/keys/icannbundle.pem /etc/unbound/icannbundle.pem \
+    && ln -s /etc/unbound/keys/icannbundle.pem /icannbundle.pem \
+    && unbound-control-setup \
+    && unbound-anchor -a /etc/unbound/keys/root.key || true
+
 # The resolver drops the privileges itself, it runs as the unbound user. The
 # supervisor needs the root rights to prepare the configuration and the cron
 # job.
