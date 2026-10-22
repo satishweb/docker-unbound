@@ -1,6 +1,9 @@
 #!/bin/bash
 # Author: Satish Gaikwad <satish@satishweb.com>
 
+# Build the provenance attestation, set PROVENANCE=false to turn it off.
+PROVENANCE=${PROVENANCE:-true}
+
 ## Functions
 __usage() {
   if [[ "$1" != "" ]]; then
@@ -11,12 +14,10 @@ __usage() {
           -p|--platforms <PlatformsList>
           -w|--work-dir <WorkDirPath>
           -t|--git-tag <TagName(Required)>
-          -a|--extra-args <ExtraArgsForDockerBuildCommand>
           --mark-latest
           --push-images
           --push-git-tags
           --no-cache
-          --load
           -h|--help"
   echo "Description:"
   echo "  -i|--image-name : Name of the docker image."
@@ -25,12 +26,16 @@ __usage() {
   echo "    (Def: linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6)"
   echo "  -w|--work-dir   : Docker buildx command work dir path"
   echo "  -t|--git-tag    : Name for git tag to create (Required)"
-  echo "  -a|--extra-args : Extra docker buidl args to pass to docker build command"
   echo "  --mark-latest   : Marks the latest image to given tag"
   echo "  --push-images   : Enables pushing of docker images to docker hub"
   echo "  --push-git-tags : Enabled push of git tags to git remote origin"
   echo "  --no-cache      : Avoid use of docker build cache"
-  echo "  --load          : Make locally built images available to build"
+  echo "  --docker-file   : Path to the docker file from working dir"
+  echo "  --docker-args   : Additional docker command arguments to supply"
+  echo "  --build-arg     : Build argument to pass to the build (KEY=VALUE)"
+  echo "  --git-branch    : Branch to check out before building"
+  echo "    (Def: the currently checked out branch)"
+  echo "  --docker-buildx-cmd : docker buildx command to use"
   echo "  -h|--help       : Prints this help menu"
   exit 1
 }
@@ -38,6 +43,7 @@ __usage() {
 __processParams() {
   extraDockerArgs=""
   imageTags=""
+  dockerFile=Dockerfile
   while [ "$1" != "" ]; do
     case $1 in
       -i|--image-name) shift
@@ -59,10 +65,6 @@ __processParams() {
                        |sed $'s/[^[:print:]\t]//g')"
                        imageTags+=" $tagName"
                        ;;
-      -a|--extra-args)    shift
-                       [[ ! $1 ]] && __usage "extra args missing"
-                       extraDockerArgs+=" $1"
-                       ;;
       --mark-latest)   imageTags+=" latest"
                        ;;
       --push-images)   imgPush=yes
@@ -71,7 +73,29 @@ __processParams() {
                        ;;
       --no-cache)      extraDockerArgs+=" --no-cache"
                        ;;
-      --load)      extraDockerArgs+=" --load"
+      --docker-file)   shift
+                       dockerFile="$1"
+                       ;;
+      --docker-args)   shift
+                       [[ ! $1 ]] && __usage "Docker args are missing"
+                       dockerArgs=$1
+                       extraDockerArgs+=" $dockerArgs"
+                       ;;
+      --build-arg)     shift
+                       [[ ! $1 ]] && __usage "Build arg is missing"
+                       extraDockerArgs+=" --build-arg $1"
+                       ;;
+      --git-branch)    shift
+                       [[ ! $1 ]] && __usage "Git branch is missing"
+                       gitBranch=$1
+                       ;;
+      --docker-buildx-cmd) shift
+                       dockerBuildxCmd="$1"
+                       # Check if the next argument exists and is not a flag
+                       if [[ "$2" && "$2" != -* ]]; then
+                         dockerBuildxCmd+=" $2"
+                         shift # Skip the second part of the command
+                       fi
                        ;;
       -h|--help)       __usage
                        ;;
@@ -84,8 +108,11 @@ __processParams() {
   [[ ! $imgPush ]] && imgPush=no
   [[ ! $tagPush ]] && tagPush=no
   [[ ! $tagName ]] && __usage "Work dir path missing"
-  [[ ! $workDir ]] && workDir="$(pwd)"
+  [[ ! $workDir ]] && workDir=$(pwd)
   [[ ! $image ]] && image=$(basename "$(pwd)")
+  [[ ! $gitBranch ]] && gitBranch="$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo master)"
+  OSF=$(echo "${dockerFile}"|cut -d '.' -f 2)
+  [[ ! $dockerBuildxCmd ]] && dockerBuildxCmd="docker buildx"
 }
 
 __errCheck(){
@@ -103,8 +130,12 @@ __dockerBuild(){
 
   tagParams=""
   for i in $2; do tagParams+=" -t $1:$i"; done
-  # shellcheck disable=SC2086
-  sudo docker buildx build --platform "$3" $5 $tagParams "$4"
+  # The provenance attestation records how and where the image was built.
+  # It can be turned off with PROVENANCE=false.
+  provenanceArg=""
+  if [ "${PROVENANCE}" = "true" ]; then provenanceArg="--provenance=true"; fi
+  # The build context is the work dir, not the current working directory.
+  eval "$dockerBuildxCmd build --platform \"$3\" $5 $tagParams $provenanceArg -f \"$4/$dockerFile\" \"$4\""
   __errCheck "$?" "Docker Build failed"
 }
 
@@ -113,42 +144,44 @@ __validations() {
   ! [[ "$tagPush" =~ ^(yes|no)$ ]] && tagPush=no
 
   # Check for buildx env
-  if [[ "$(sudo docker buildx ls\
-           |grep -ce '.*default.*running.*linux/amd64' \
-          )" -lt "1" ]]; then
+  # The builder that is marked with a "*" has to be up and running.
+  if ! eval "$dockerBuildxCmd" ls 2>/dev/null | sed -n '/\*/{n;p;}' | grep -q 'running'; then
     __errCheck "1" "Docker buildx env is not setup, please fix it"
   fi
 }
 
 __checkSource() {
-  # Lets do git pull if push is enabled
-  if [[ "$imgPush" == "yes" ]]; then
-    git checkout main >/dev/null 2>&1
-    __errCheck "$?" "Git checkout to main branch failed..."
+  # Lets do git pull if tag push is enabled
+  if [[ "$tagPush" == "yes" ]]; then
+    git checkout "${gitBranch}" >/dev/null 2>&1
+    __errCheck "$?" "Git checkout to ${gitBranch} branch failed..."
     git pull >/dev/null 2>&1
-    __errCheck "$?" "Git pull for main branch failed..."
+    __errCheck "$?" "Git pull for ${gitBranch} branch failed..."
   fi
 }
 
 __setupDocker() {
   # Lets prepare docker image
   if [[ "$imgPush" == "yes" ]]; then
-    echo "INFO: Logging in to Docker HUB... (Interactive Mode)"
-    sudo docker login 2>&1 | sed 's/^/INFO: DOCKER: /g'
-    __errCheck "$?" "Docker login failed..."
+    # Skip the login when the registry credentials are already available.
+    # An interactive login is not possible in a non interactive shell.
+    if docker info 2>/dev/null | grep -qE "^[[:space:]]*Username:"; then
+      echo "INFO: Already logged in to the Docker registry, skipping the login."
+    else
+      echo "INFO: Logging in to Docker HUB... (Interactive Mode)"
+      docker login 2>&1 | sed 's/^/INFO: DOCKER: /g'
+      __errCheck "$?" "Docker login failed..."
+    fi
     extraDockerArgs+=" --push"
   fi
-  sudo docker buildx create --name builder >/dev/null 2>&1
-  sudo docker buildx use builder >/dev/null 2>&1
-  __errCheck "$?" "Could not use docker buildx default runner..."
 }
 
 __createGitTag() {
   # Lets create git tag
-  echo "INFO: Creating local git tag: $tagName"
-  git tag -d "$tagName" >/dev/null 2>&1
-  git tag "$tagName" >/dev/null 2>&1
   if [[ "$tagPush" == "yes" ]]; then
+    echo "INFO: Creating local git tag: $tagName"
+    git tag -d "$tagName" >/dev/null 2>&1
+    git tag "$tagName" >/dev/null 2>&1
     echo "INFO: Pushing git tag to remote: $tagName"
     git push --delete origin "$tagName" >/dev/null 2>&1
     git push -f origin "$tagName" >/dev/null 2>&1
@@ -166,9 +199,10 @@ __setupDocker
 echo "INFO: Building Docker Images (may take a while)"
 echo "INFO: Docker image      : $image"
 echo "INFO: Platforms         : $platforms"
-echo "INFO: Docker image tags : $imageTags"
+echo "INFO: DockerFile        : $dockerFile"
+echo "INFO: Docker image tags : $imageTags $OSF"
 echo "INFO: Image tags push?  : $imgPush"
 echo "INFO: Git tags          : $tagName"
 echo "INFO: Git tags push?    : $tagPush"
-__dockerBuild "$image" "$imageTags" "$platforms" "$workDir" "$extraDockerArgs"
+__dockerBuild "$image" "$imageTags $OSF" "$platforms" "$workDir" "$extraDockerArgs"
 __createGitTag "$tagName"

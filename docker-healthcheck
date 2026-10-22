@@ -1,0 +1,32 @@
+#!/bin/sh
+# Author: Satish Gaikwad <satish@satishweb.com>
+#
+# Health check for the Unbound DNS cache server.
+#
+# The check asks the server for a name. Every answer proves that the server is
+# running and forwarding, it does not matter whether the name exists. That
+# way the check does not depend on the internet or on a working upstream
+# resolver.
+#
+# Exit code 0 means healthy.
+
+# The address the server listens on.
+address=${UNBOUND_HEALTHCHECK_ADDRESS:-127.0.0.1}
+port=${UNBOUND_HEALTHCHECK_PORT:-53}
+
+# The server has to answer with a DNS response. A name that does not exist
+# gives NXDOMAIN and a name that cannot be resolved gives SERVFAIL, both are
+# answers of the local server.
+if drill "@${address}" -p "${port}" "${UNBOUND_HEALTHCHECK_NAME:-localhost}" 2>&1 \
+    | grep -q "rcode:"; then
+    exit 0
+fi
+
+# Fall back to a check of the listening socket, it proves that the server is
+# up even when it does not answer queries.
+if nc -z "${address}" "${port}" >/dev/null 2>&1; then
+    exit 0
+fi
+
+echo "The unbound server did not answer on ${address}:${port}." >&2
+exit 1
