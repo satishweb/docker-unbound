@@ -152,8 +152,22 @@ else
   sleep 1000000000
 fi
 
-printf "#!/bin/bash\nPATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin\n" > "${CRON_FILE}"
-printf '. /scripts/update_blocked_hosts.sh %s\n' "${UNBOUND_BLOCKED_HOSTS_FILE}" >> "${CRON_FILE}"
+# The cron job runs in its own shell, the variables of the block list sources
+# and the white list are written into it so the daily update uses the same
+# settings as the container.
+{
+  printf "#!/bin/bash\nPATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin\n"
+  printf 'export SOURCE_StevenBlack_Unified_Hosts="%s"\n' "${SOURCE_StevenBlack_Unified_Hosts}"
+  printf 'export SOURCE_StevenBlack_Fakenews="%s"\n' "${SOURCE_StevenBlack_Fakenews}"
+  printf 'export SOURCE_StevenBlack_Gambling="%s"\n' "${SOURCE_StevenBlack_Gambling}"
+  printf 'export SOURCE_StevenBlack_Porn="%s"\n' "${SOURCE_StevenBlack_Porn}"
+  printf 'export SOURCE_TheGreatWall_Default="%s"\n' "${SOURCE_TheGreatWall_Default}"
+  printf 'export SOURCE_AdWars_Default="%s"\n' "${SOURCE_AdWars_Default}"
+  printf 'export SOURCE_VeleSila_Default="%s"\n' "${SOURCE_VeleSila_Default}"
+  printf 'export SOURCE_Tiuxo_Default="%s"\n' "${SOURCE_Tiuxo_Default}"
+  printf 'export DOMAIN_WHITELIST="%s"\n' "${DOMAIN_WHITELIST:-}"
+  printf '. /scripts/update_blocked_hosts.sh %s\n' "${UNBOUND_BLOCKED_HOSTS_FILE}"
+} > "${CRON_FILE}"
 chmod +x "${CRON_FILE}"
 
 # Check if app-config is present
