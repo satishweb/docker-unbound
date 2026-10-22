@@ -140,6 +140,10 @@ def run_tests(image_name, port, timeout):
             try:
                 with open(os.path.join(secret_dir, "DOMAIN_WHITELIST"), "w") as handle:
                     handle.write("example.com\n")
+                # The resolver runs as an unprivileged user, it has to be able
+                # to read the secret.
+                os.chmod(secret_dir, 0o755)
+                os.chmod(os.path.join(secret_dir, "DOMAIN_WHITELIST"), 0o644)
                 container = self.client.containers.run(
                     image_name,
                     detach=True,
