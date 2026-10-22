@@ -64,4 +64,5 @@ jobs:
             docker-entrypoint \
             docker-healthcheck \
             build.sh \
+            app-config-example \
             scripts/update_blocked_hosts.sh
