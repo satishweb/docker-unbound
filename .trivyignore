@@ -1,0 +1,10 @@
+# Findings of the scan of the image that are accepted.
+#
+# The format is the one of the ignore file of trivy, an entry is a finding
+# that is not reported. An entry can have an expiry date, the finding is
+# reported again when the date is reached.
+#
+# The image is built from the alpine release that is pinned in the
+# Dockerfile, the scan of the operating system packages of the image is
+# clean. The file is kept so that a finding that is accepted in the future
+# has a place with a reason and an expiry date.
