@@ -64,10 +64,10 @@ def resolve(container, name):
     """
     output = container.exec_run(f"drill @127.0.0.1 {name}").output.decode("utf-8", errors="replace")
     for line in output.splitlines():
-        # The answer lines look like "name.\tIN\tA\t192.0.2.42"
+        # The answer lines look like "name.\t3600\tIN\tA\t192.0.2.42"
         parts = line.split()
-        if len(parts) == 4 and parts[1] == "IN" and parts[2] == "A":
-            return parts[3]
+        if len(parts) >= 5 and parts[-3] == "IN" and parts[-2] == "A":
+            return parts[-1]
     return ""
 
 
