@@ -94,6 +94,9 @@ def run_tests(image_name, port, timeout):
                 },
                 volumes={self.custom_dir: {"bind": "/etc/unbound/custom", "mode": "ro"}},
             )
+            # The server needs the block list before it starts to answer, that
+            # takes a moment.
+            wait_for_container_health(self.container)
 
         def tearDown(self):
             self.container.stop()
