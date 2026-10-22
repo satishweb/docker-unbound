@@ -38,21 +38,40 @@ RUN chmod u+x /docker-entrypoint /docker-healthcheck /scripts/* \
 # Forcing ipv4 as docker builder is not setup with ipv6
 RUN curl  --ipv4 https://www.internic.net/domain/named.root > /etc/unbound/root.hints
 
-# The certificate authority of the internet, the control certificates of the
-# resolver and the root anchor key are prepared while the image is built. The
-# container does not have to download them when it starts, it does not need
-# the network and it does not need the root rights for it.
+# The certificate authority of the internet and the root anchor key are
+# prepared while the image is built. The container does not have to download
+# them when it starts, it does not need the network and it does not need the
+# root rights for it.
+#
+# The control certificates of the resolver are not prepared here, they are
+# secrets and every container needs its own ones. They are created when the
+# container starts.
 RUN curl -fsSL https://data.iana.org/root-anchors/icannbundle.pem \
         --output /etc/unbound/keys/icannbundle.pem \
     && ln -s /etc/unbound/keys/icannbundle.pem /etc/unbound/icannbundle.pem \
     && ln -s /etc/unbound/keys/icannbundle.pem /icannbundle.pem \
-    && unbound-control-setup \
     && unbound-anchor -a /etc/unbound/keys/root.key || true
 
-# The resolver drops the privileges itself, it runs as the unbound user. The
-# supervisor needs the root rights to prepare the configuration and the cron
-# job.
+# The files of the configuration belong to the user the container runs as, the
+# container does not have to change the owner of them when it starts.
 RUN chown -Rf unbound:unbound /etc/unbound
+
+# The job that updates the block list. The directory of the periodic jobs
+# belongs to root, the job is created while the image is built. The settings
+# of the block list sources are read from a file that the entrypoint writes
+# when the container starts.
+RUN printf '#!/bin/bash\nPATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin\n. /etc/unbound/sources.env\n. /scripts/update_blocked_hosts.sh /etc/unbound/unbound.blocked.hosts\n' > /etc/periodic/daily/updatehosts \
+    && chmod 0755 /etc/periodic/daily/updatehosts \
+    && chown unbound:unbound /etc/periodic/daily/updatehosts
+
+# The crontab of the user, the cron daemon of busybox reads the file of the
+# user it runs as.
+RUN cp /etc/crontabs/root /etc/crontabs/unbound \
+    && chown unbound:unbound /etc/crontabs/unbound
+
+# The container runs as the user of the resolver, it does not need the root
+# rights for anything.
+USER unbound
 
 # Run the command on container startup
 ENTRYPOINT ["/docker-entrypoint"]

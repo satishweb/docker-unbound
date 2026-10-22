@@ -3,11 +3,15 @@
 #
 # shellcheck disable=SC2154
 # The variables of the block list sources and of the white list are read from
-# the environment, the entrypoint writes them into the cron job.
+# the environment, the entrypoint writes them into the file with the settings
+# when the container starts.
 
-# The variables of the block list sources and the white list are read from
-# the environment. The entrypoint writes them into the cron job, so the daily
-# update uses the same settings as the container.
+# The settings of the container, the job that updates the block list reads
+# them from the file. The file is not there when the script is run by hand.
+if [ -f /etc/unbound/sources.env ]; then
+  # shellcheck disable=SC1091
+  . /etc/unbound/sources.env
+fi
 
 if [ "$1" = "" ]; then
   UNBOUND_BLOCKED_HOSTS_FILE=/etc/unbound/unbound.blocked.hosts
