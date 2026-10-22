@@ -31,7 +31,9 @@ ADD unbound.sample.conf /templates/unbound.sample.conf
 ADD docker-entrypoint /docker-entrypoint
 ADD docker-healthcheck /docker-healthcheck
 COPY scripts /scripts
-RUN chmod u+x /docker-entrypoint /docker-healthcheck /scripts/* \
+# The container does not run as root, the files have to be executable for
+# everybody and not only for the owner.
+RUN chmod 0755 /docker-entrypoint /docker-healthcheck /scripts/* \
     && mkdir -p /etc/unbound/keys /etc/unbound/custom
 
 # Setup rootkeys
