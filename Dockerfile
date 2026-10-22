@@ -56,6 +56,10 @@ RUN curl -fsSL https://data.iana.org/root-anchors/icannbundle.pem \
 # container does not have to change the owner of them when it starts.
 RUN chown -Rf unbound:unbound /etc/unbound
 
+# The configuration of the supervisor is only readable by root, the container
+# does not run as root.
+RUN chmod 0644 /etc/supervisord.conf
+
 # The job that updates the block list. The directory of the periodic jobs
 # belongs to root, the job is created while the image is built. The settings
 # of the block list sources are read from a file that the entrypoint writes
