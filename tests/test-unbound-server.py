@@ -83,7 +83,9 @@ def run_tests(image_name, port, timeout):
                 tempfile.mkdtemp(prefix="unbound-custom-", dir=os.path.expanduser("~"))
             )
             with open(os.path.join(self.custom_dir, "custom.hosts"), "w") as handle:
-                handle.write(f"{CUSTOM_ADDRESS} {CUSTOM_DOMAIN}\n")
+                # The custom hosts file is a part of the unbound configuration
+                handle.write(f'local-zone: "{CUSTOM_DOMAIN}" transparent\n')
+                handle.write(f'local-data: "{CUSTOM_DOMAIN} A {CUSTOM_ADDRESS}"\n')
             self.container = self.client.containers.run(
                 image_name,
                 detach=True,
