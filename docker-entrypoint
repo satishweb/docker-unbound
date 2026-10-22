@@ -1,5 +1,8 @@
 #!/bin/sh
 # Author: Satish Gaikwad <satish@satishweb.com>
+#
+# shellcheck disable=SC3043
+# The script runs with the busybox shell, it supports local.
 set -e
 
 # ---------------------------------------------------------------------------
@@ -15,25 +18,8 @@ SECRET_DIR=/run/secrets
 # Lets determine the OS flavor
 OSF=$(cat /etc/os-release|grep -e '^ID=.*'|cut -d '=' -f 2)
 
-UNBOUND_CONFIG_DIR=/etc/unbound
-export UNBOUND_CONFIG_FILE=${UNBOUND_CONFIG_FILE:-${UNBOUND_CONFIG_DIR}/unbound.conf}
-export UNBOUND_CONFIG_SAMPLE_FILE=${UNBOUND_CONFIG_SAMPLE_FILE:-/templates/unbound.sample.conf}
-export UNBOUND_ANCHOR_FILE=${UNBOUND_ANCHOR_FILE:-${UNBOUND_CONFIG_DIR}/keys/root.key}
-export UNBOUND_BLOCKED_HOSTS_FILE=${UNBOUND_BLOCKED_HOSTS_FILE:-${UNBOUND_CONFIG_DIR}/unbound.blocked.hosts}
-export UNBOUND_CUSTOM_HOSTS_FILE=${UNBOUND_CUSTOM_HOSTS_FILE:-${UNBOUND_CONFIG_DIR}/custom/custom.hosts}
-export ICANN_BUNDLE_FILE=${ICANN_BUNDLE_FILE:-${UNBOUND_CONFIG_DIR}/keys/icannbundle.pem}
-
 printf "|---------------------------------------------------------------------------------------------\n";
 printf "| Starting Unbound DNS Cache Server\n"
-
-export ${SOURCE_StevenBlack_Unified_Hosts:=true}
-export ${SOURCE_StevenBlack_Fakenews:=true}
-export ${SOURCE_StevenBlack_Gambling:=true}
-export ${SOURCE_StevenBlack_Porn:=true}
-export ${SOURCE_TheGreatWall_Default:=true}
-export ${SOURCE_AdWars_Default:=true}
-export ${SOURCE_VeleSila_Default:=true}
-export ${SOURCE_Tiuxo_Default:=true}
 
 # ---------------------------------------------------------------------------
 # Docker secrets
@@ -45,6 +31,10 @@ export ${SOURCE_Tiuxo_Default:=true}
 # Only the *names* of the variables are iterated over and the file contents
 # are read verbatim.  This keeps secret values that contain whitespace or
 # shell metacharacters intact.
+#
+# The secrets are loaded before the variables of the image are exported. Some
+# of them end with _FILE as well and would be mistaken for a secret
+# otherwise.
 # ---------------------------------------------------------------------------
 __secretNames() {
     env | sed -n "s/^\([A-Za-z_][A-Za-z0-9_]*\)${SECRET_FILE_ENV_SUFFIX}=.*/\1/p" | sort -u
@@ -68,6 +58,23 @@ __loadSecrets() {
 
 __log "Loading docker secrets if found..."
 __loadSecrets
+
+export SOURCE_StevenBlack_Unified_Hosts="${SOURCE_StevenBlack_Unified_Hosts:-true}"
+export SOURCE_StevenBlack_Fakenews="${SOURCE_StevenBlack_Fakenews:-true}"
+export SOURCE_StevenBlack_Gambling="${SOURCE_StevenBlack_Gambling:-true}"
+export SOURCE_StevenBlack_Porn="${SOURCE_StevenBlack_Porn:-true}"
+export SOURCE_TheGreatWall_Default="${SOURCE_TheGreatWall_Default:-true}"
+export SOURCE_AdWars_Default="${SOURCE_AdWars_Default:-true}"
+export SOURCE_VeleSila_Default="${SOURCE_VeleSila_Default:-true}"
+export SOURCE_Tiuxo_Default="${SOURCE_Tiuxo_Default:-true}"
+
+UNBOUND_CONFIG_DIR=/etc/unbound
+export UNBOUND_CONFIG_FILE="${UNBOUND_CONFIG_FILE:-${UNBOUND_CONFIG_DIR}/unbound.conf}"
+export UNBOUND_CONFIG_SAMPLE_FILE="${UNBOUND_CONFIG_SAMPLE_FILE:-/templates/unbound.sample.conf}"
+export UNBOUND_ANCHOR_FILE="${UNBOUND_ANCHOR_FILE:-${UNBOUND_CONFIG_DIR}/keys/root.key}"
+export UNBOUND_BLOCKED_HOSTS_FILE="${UNBOUND_BLOCKED_HOSTS_FILE:-${UNBOUND_CONFIG_DIR}/unbound.blocked.hosts}"
+export UNBOUND_CUSTOM_HOSTS_FILE="${UNBOUND_CUSTOM_HOSTS_FILE:-${UNBOUND_CONFIG_DIR}/custom/custom.hosts}"
+export ICANN_BUNDLE_FILE="${ICANN_BUNDLE_FILE:-${UNBOUND_CONFIG_DIR}/keys/icannbundle.pem}"
 
 # DEBUG may be provided as a plain variable or through a secret.  A secret
 # named "DEBUG" is also honoured for backwards compatibility.
@@ -146,13 +153,14 @@ else
 fi
 
 printf "#!/bin/bash\nPATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin\n" > "${CRON_FILE}"
-printf ". /scripts/update_blocked_hosts.sh ${UNBOUND_BLOCKED_HOSTS_FILE}\n" >> "${CRON_FILE}"
+printf '. /scripts/update_blocked_hosts.sh %s\n' "${UNBOUND_BLOCKED_HOSTS_FILE}" >> "${CRON_FILE}"
 chmod +x "${CRON_FILE}"
 
 # Check if app-config is present
 if [ -f /app-config ]; then
     # We expect that app-config handles the launch of app command
     __log "Executing app-config..."
+    # shellcheck disable=SC1091,SC2240
     . /app-config "$@"
 else
     # Let default CMD run if app-config is missing
