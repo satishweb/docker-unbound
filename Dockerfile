@@ -21,7 +21,7 @@ RUN apk add \
 RUN apk add \
         unbound=${UNBOUND_VERSION} \
     && rm -rf /etc/unbound/unbound.conf /etc/unbound/root.hints \
-    && test "$(apk info -v unbound)" = "unbound-${UNBOUND_VERSION}"
+    && test "$(apk list --installed unbound 2>/dev/null | head -1 | awk '{print $1}')" = "unbound-${UNBOUND_VERSION}"
 
 # Add supervisord.conf
 ADD supervisor-unbound.ini /etc/supervisor.d/supervisor-unbound.ini
