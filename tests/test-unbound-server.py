@@ -82,10 +82,14 @@ def run_tests(image_name, port, timeout):
             self.custom_dir = os.path.realpath(
                 tempfile.mkdtemp(prefix="unbound-custom-", dir=os.path.expanduser("~"))
             )
+            # The resolver runs as an unprivileged user, it has to be able to
+            # read the file that is mounted into the container.
+            os.chmod(self.custom_dir, 0o755)
             with open(os.path.join(self.custom_dir, "custom.hosts"), "w") as handle:
                 # The custom hosts file is a part of the unbound configuration
                 handle.write(f'local-zone: "{CUSTOM_DOMAIN}" transparent\n')
                 handle.write(f'local-data: "{CUSTOM_DOMAIN} A {CUSTOM_ADDRESS}"\n')
+            os.chmod(os.path.join(self.custom_dir, "custom.hosts"), 0o644)
             self.container = self.client.containers.run(
                 image_name,
                 detach=True,
@@ -136,6 +140,10 @@ def run_tests(image_name, port, timeout):
             try:
                 with open(os.path.join(secret_dir, "DOMAIN_WHITELIST"), "w") as handle:
                     handle.write("example.com\n")
+                # The resolver runs as an unprivileged user, it has to be able
+                # to read the secret.
+                os.chmod(secret_dir, 0o755)
+                os.chmod(os.path.join(secret_dir, "DOMAIN_WHITELIST"), 0o644)
                 container = self.client.containers.run(
                     image_name,
                     detach=True,

@@ -110,17 +110,22 @@ if [ ! -d "${UNBOUND_CONFIG_DIR}/keys" ]; then
   mkdir -p "${UNBOUND_CONFIG_DIR}/keys"
 fi
 
-# Lets download icannbundle.pem if it does not exists
+# The certificate authority of the internet and the control certificates of
+# the resolver are prepared while the image is built. They are only created
+# here when they are missing, for example when a volume is mounted over the
+# configuration directory.
 if [ ! -f "${ICANN_BUNDLE_FILE}" ]; then
-  curl https://data.iana.org/root-anchors/icannbundle.pem --output "${ICANN_BUNDLE_FILE}" >/dev/null 2>&1
-  ln -s "${ICANN_BUNDLE_FILE}" "${UNBOUND_CONFIG_DIR}/icannbundle.pem"
-  ln -s "${ICANN_BUNDLE_FILE}" /icannbundle.pem
+  curl -fsSL https://data.iana.org/root-anchors/icannbundle.pem --output "${ICANN_BUNDLE_FILE}" >/dev/null 2>&1
+  ln -sf "${ICANN_BUNDLE_FILE}" "${UNBOUND_CONFIG_DIR}/icannbundle.pem"
+  ln -sf "${ICANN_BUNDLE_FILE}" /icannbundle.pem
 fi
 
 # Lets generate certificates if not created already
+# They are the secrets of the control interface of the resolver, every
+# container needs its own ones so they are never part of the image.
 if [ ! -f "${UNBOUND_CONFIG_DIR}/unbound_control.pem" ] || [ ! -f "${UNBOUND_CONFIG_DIR}/unbound_server.pem" ]; then
   __log "Setting up unbound certificates..."
-  unbound-control-setup 2>&1 | sed 's/^/| ENTRYPOINT: Unbound: /g'
+  unbound-control-setup -d "${UNBOUND_CONFIG_DIR}" 2>&1 | sed 's/^/| ENTRYPOINT: Unbound: /g'
 fi
 
 # Lets create or validate root anchor key
@@ -131,7 +136,7 @@ unbound-anchor -a "${UNBOUND_ANCHOR_FILE}" || echo
 # Lets set correct permissions for files used by unbound
 chown -Rf unbound:unbound "${UNBOUND_CONFIG_DIR}" "${UNBOUND_CONFIG_DIR}/keys" 2>/dev/null || \
   __warn "Could not change the owner of ${UNBOUND_CONFIG_DIR}, continuing."
-chmod 644 "${UNBOUND_CONFIG_DIR}"/*.conf
+chmod 644 "${UNBOUND_CONFIG_DIR}"/*.conf 2>/dev/null || true
 
 # Setup blocked hosts file if it does not exists
 if [ ! -f "${UNBOUND_BLOCKED_HOSTS_FILE}" ]; then
@@ -141,34 +146,31 @@ fi
 __log "Starting supervisord (which starts and monitors cron and unbound)"
 printf "|---------------------------------------------------------------------------------------------\n";
 
-# Lets create cron script for updating host daily
-if [ "$OSF" = "ubuntu" ]; then
-  rm -rf /etc/cron.daily/*
-  CRON_FILE=/etc/cron.daily/updatehosts
-elif [ "$OSF" = "alpine" ]; then
-  CRON_FILE=/etc/periodic/daily/updatehosts
-else
+# The job that updates the block list is part of the image, the directory of
+# the periodic jobs belongs to root. Only the settings of the block list
+# sources are written here.
+if [ "$OSF" != "ubuntu" ] && [ "$OSF" != "alpine" ]; then
   echo "Error: We support only alpine and ubuntu flavors right now"
   sleep 1000000000
 fi
 
-# The cron job runs in its own shell, the variables of the block list sources
-# and the white list are written into it so the daily update uses the same
-# settings as the container.
+# The settings of the block list sources and of the white list are written to
+# a file. The job that updates the block list reads them from there, the job
+# itself is part of the image because the directory of the periodic jobs
+# belongs to root.
 {
-  printf "#!/bin/bash\nPATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin\n"
-  printf 'export SOURCE_StevenBlack_Unified_Hosts="%s"\n' "${SOURCE_StevenBlack_Unified_Hosts}"
-  printf 'export SOURCE_StevenBlack_Fakenews="%s"\n' "${SOURCE_StevenBlack_Fakenews}"
-  printf 'export SOURCE_StevenBlack_Gambling="%s"\n' "${SOURCE_StevenBlack_Gambling}"
-  printf 'export SOURCE_StevenBlack_Porn="%s"\n' "${SOURCE_StevenBlack_Porn}"
-  printf 'export SOURCE_TheGreatWall_Default="%s"\n' "${SOURCE_TheGreatWall_Default}"
-  printf 'export SOURCE_AdWars_Default="%s"\n' "${SOURCE_AdWars_Default}"
-  printf 'export SOURCE_VeleSila_Default="%s"\n' "${SOURCE_VeleSila_Default}"
-  printf 'export SOURCE_Tiuxo_Default="%s"\n' "${SOURCE_Tiuxo_Default}"
-  printf 'export DOMAIN_WHITELIST="%s"\n' "${DOMAIN_WHITELIST:-}"
-  printf '. /scripts/update_blocked_hosts.sh %s\n' "${UNBOUND_BLOCKED_HOSTS_FILE}"
-} > "${CRON_FILE}"
-chmod +x "${CRON_FILE}"
+  printf 'SOURCE_StevenBlack_Unified_Hosts="%s"\n' "${SOURCE_StevenBlack_Unified_Hosts}"
+  printf 'SOURCE_StevenBlack_Fakenews="%s"\n' "${SOURCE_StevenBlack_Fakenews}"
+  printf 'SOURCE_StevenBlack_Gambling="%s"\n' "${SOURCE_StevenBlack_Gambling}"
+  printf 'SOURCE_StevenBlack_Porn="%s"\n' "${SOURCE_StevenBlack_Porn}"
+  printf 'SOURCE_TheGreatWall_Default="%s"\n' "${SOURCE_TheGreatWall_Default}"
+  printf 'SOURCE_AdWars_Default="%s"\n' "${SOURCE_AdWars_Default}"
+  printf 'SOURCE_VeleSila_Default="%s"\n' "${SOURCE_VeleSila_Default}"
+  printf 'SOURCE_Tiuxo_Default="%s"\n' "${SOURCE_Tiuxo_Default}"
+  printf 'DOMAIN_WHITELIST="%s"\n' "${DOMAIN_WHITELIST:-}"
+} > "${UNBOUND_CONFIG_DIR}/sources.env"
+chmod 0644 "${UNBOUND_CONFIG_DIR}/sources.env"
+__log "The settings of the block list were written to ${UNBOUND_CONFIG_DIR}/sources.env"
 
 # Check if app-config is present
 if [ -f /app-config ]; then
