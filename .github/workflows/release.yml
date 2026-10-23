@@ -72,6 +72,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+        fetch-depth: 0
       - name: Resolve the release
         id: release
         env:
@@ -106,7 +107,6 @@ jobs:
             UNBOUND_VERSION=${{ steps.release.outputs.version }}
           load: true
           tags: unbound:verify
-          provenance: false
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -160,6 +160,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+        fetch-depth: 0
       - name: Resolve the release
         id: release
         env:
@@ -213,9 +214,8 @@ jobs:
           platforms: linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6
           build-args: |
             UNBOUND_VERSION=${{ steps.release.outputs.version }}
-          push: ${{ !inputs.dry_run }}
+          push: true
           tags: ${{ steps.release.outputs.tags }}
-          provenance: false
           labels: |
             org.opencontainers.image.title=Unbound DNS Cache Server
             org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
@@ -234,6 +234,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+        fetch-depth: 0
       - name: Pull the image of the platform
         run: |
           docker pull --platform ${{ matrix.platform }} \
