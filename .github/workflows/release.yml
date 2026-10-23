@@ -214,7 +214,7 @@ jobs:
           while IFS= read -r tag; do
             [ -n "$tag" ] && args+=(-t "$tag")
           done <<< "$tags"
-          docker buildx build --push --platform linux/amd64 -f Dockerfile "${args[@]}" .
+          docker buildx build --push --provenance=false --platform linux/amd64 -f Dockerfile "${args[@]}" .
   scan-platforms:
     name: Scan the published image
     needs: publish
